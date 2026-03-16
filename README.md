@@ -1,2 +1,2 @@
-# TeamSEM_b20_Project
-Group Project for CSCB20 - Web Application
+# Weekly Meal Planner
+A website that intends to orgainzie recipes and create a weekly meal plan
