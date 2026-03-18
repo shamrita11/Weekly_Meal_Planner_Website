@@ -1,6 +1,6 @@
 -- 1. Recipe
-INSERT INTO Recipe (recipeID, title, favorites, cook_time, instructions, image)
-VALUES (10, 'Spicy Garlic Shrimp', 'no', '15 min', '1. Mince garlic. 2. Sauté shrimp in olive oil. 3. Add garlic and red pepper flakes. 4. Serve hot.', 'shrimp_pic.png');
+INSERT INTO Recipe (recipeID, title, cook_time, instructions)
+VALUES (10, 'Spicy Garlic Shrimp', '15 min', '1. Mince garlic. 2. Sauté shrimp in olive oil. 3. Add garlic and red pepper flakes. 4. Serve hot.');
 
 -- 2. Ingredients
 INSERT INTO Ingredient (ingreID, ingredient)
