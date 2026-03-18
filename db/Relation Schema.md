@@ -1,20 +1,20 @@
 ## Relational Schema
-Recipe (<u>recipeID</u>, title, favorites, cook_time, instructions, image) <br>
-Ingredient (<u>ingreID</u>, ingredient)
+Recipe (<ins>recipeID</ins>, title, favorites, cook_time, instructions, image) <br>
+Ingredient (<ins>ingreID</ins>, ingredient)
 <br>
-Recipe_Ingredient (<u>recipeID, ingreID</u>, qty, unit)
+Recipe_Ingredient (<ins>recipeID, ingreID</ins>, qty, unit)
 <br>
-Tag (<u>tagID</u>, tag)
+Tag (<ins>tagID</ins>, tag)
 <br>
-Recipe_Tag (<u>recipeID, tagID</u>)
+Recipe_Tag (<ins>recipeID, tagID</ins>)
 <br>
-Seasoning (<u>sID</u>, seasoning)
+Seasoning (<ins>sID</ins>, seasoning)
 <br>
-Recipe_Seasoning (<u>recipeID, sID</u>, qty, unit)
+Recipe_Seasoning (<ins>recipeID, sID</ins>, qty, unit)
 <br>
-MealPlan (<u>mID</u>, wID, day, mealTime, recipeID)
+MealPlan (<ins>mID</ins>, wID, day, mealTime, recipeID)
 <br>
-ShoppingList (<u>itemID</u>, ingreID, unit, qty, checked)
+ShoppingList (<ins>itemID</ins>, ingreID, unit, qty, checked)
 
 <hr>
 
@@ -24,7 +24,7 @@ Recipe_Ingredient [ingreID] $\subseteq$ Ingredient [ingreID]
 
 Recipe_Tag [recipeID] $\subseteq$ Recipe [recipeID]
 <br>
-Recipe_Tag [ingreID] $\subseteq$ Tag [tagID]
+Recipe_Tag [tagID] $\subseteq$ Tag [tagID]
 
 Recipe_Seasoning [recipeID] $\subseteq$ Recipe [recipeID]
 <br>
