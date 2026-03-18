@@ -1,0 +1,69 @@
+CREATE TABLE Recipe (
+    recipeID INT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    favorites VARCHAR(10) DEFAULT 'no',
+    cook_time VARCHAR(50) DEFAULT NULL,
+    instructions TEXT DEFAULT NULL,
+    image VARCHAR(255) DEFAULT NULL
+);
+
+CREATE TABLE Ingredient (
+    ingreID INT PRIMARY KEY,
+    ingredient VARCHAR(255) UNIQUE NOT NULL
+);
+
+CREATE TABLE Recipe_Ingredient (
+    recipeID INT,
+    ingreID INT,
+    qty NUMERIC DEFAULT 1,
+    unit VARCHAR(50) DEFAULT NULL,
+    PRIMARY KEY (recipeID, ingreID),
+    FOREIGN KEY (recipeID) REFERENCES Recipe(recipeID),
+    FOREIGN KEY (ingreID) REFERENCES Ingredient(ingreID)
+);
+
+CREATE TABLE Tag (
+    tagID INT PRIMARY KEY,
+    tag VARCHAR(100) UNIQUE NOT NULL
+);
+
+CREATE TABLE Recipe_Tag (
+    recipeID INT,
+    tagID INT,
+    PRIMARY KEY (recipeID, tagID),
+    FOREIGN KEY (recipeID) REFERENCES Recipe(recipeID),
+    FOREIGN KEY (tagID) REFERENCES Tag(tagID)
+);
+
+CREATE TABLE Seasoning (
+    sID INT PRIMARY KEY,
+    seasoning VARCHAR(255) UNIQUE NOT NULL
+);
+
+CREATE TABLE Recipe_Seasoning (
+    recipeID INT,
+    sID INT,
+    qty VARCHAR(100) DEFAULT NULL,
+    unit VARCHAR(50) DEFAULT NULL,
+    PRIMARY KEY (recipeID, sID),
+    FOREIGN KEY (recipeID) REFERENCES Recipe(recipeID),
+    FOREIGN KEY (sID) REFERENCES Seasoning(sID)
+);
+
+CREATE TABLE MealPlan (
+    mID INT PRIMARY KEY,
+    wID DATE NOT NULL,
+    day VARCHAR(20) NOT NULL,
+    mealTime VARCHAR(50) NOT NULL,
+    recipeID INT,
+    FOREIGN KEY (recipeID) REFERENCES Recipe(recipeID)
+);
+
+CREATE TABLE ShoppingList (
+    itemID INT PRIMARY KEY,
+    ingreID INT,
+    unit VARCHAR(50),
+    qty NUMERIC NOT NULL,
+    checked VARCHAR(10) DEFAULT 'no',
+    FOREIGN KEY (ingreID) REFERENCES Ingredient(ingreID)
+);

@@ -1,0 +1,33 @@
+-- 1. Recipe
+INSERT INTO Recipe (recipeID, title, favorites, cook_time, instructions, image)
+VALUES (10, 'Spicy Garlic Shrimp', 'no', '15 min', '1. Mince garlic. 2. Sauté shrimp in olive oil. 3. Add garlic and red pepper flakes. 4. Serve hot.', 'shrimp_pic.png');
+
+-- 2. Ingredients
+INSERT INTO Ingredient (ingreID, ingredient)
+VALUES (201, 'shrimp'), 
+       (202, 'olive oil');
+
+-- 3. Recipe_Ingredient
+INSERT INTO Recipe_Ingredient (recipeID, ingreID, qty, unit)
+VALUES (10, 201, 1, 'lb'),
+       (10, 202, 2, 'tbsp');
+
+-- 4. Tags
+INSERT INTO Tag (tagID, tag)
+VALUES (50, 'Seafood'), 
+       (51, 'Keto');
+
+-- 5. Recipe_Tag
+INSERT INTO Recipe_Tag (recipeID, tagID)
+VALUES (10, 50), 
+       (10, 51);
+
+-- 6. Seasonings
+INSERT INTO Seasoning (sID, seasoning)
+VALUES (301, 'garlic'),
+       (302, 'red pepper flakes'), (303, 'salt');
+
+-- 7. Recipe_Seasoning
+INSERT INTO Recipe_Seasoning (recipeID, sID, qty, unit)
+VALUES (10, 301, '3', 'cloves'),
+       (10, 302, '1', 'tsp'), (10, 303, '1', 'pinch')
