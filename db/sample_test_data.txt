@@ -22,21 +22,11 @@ INSERT INTO Recipe_Tag (recipeID, tagID)
 VALUES (10, 50), 
        (10, 51);
 
--- 6. Seasonings
-INSERT INTO Seasoning (sID, seasoning)
-VALUES (301, 'garlic'),
-       (302, 'red pepper flakes'), (303, 'salt');
-
--- 7. Recipe_Seasoning
-INSERT INTO Recipe_Seasoning (recipeID, sID, qty, unit)
-VALUES (10, 301, '3', 'cloves'),
-       (10, 302, '1', 'tsp'), (10, 303, '1', 'pinch')
-
--- 8. MealPlan (Using the start date of the current week: 2026-03-16)
-INSERT INTO MealPlan (mID, wID, day, mealTime, recipeID)
+-- 6. MealPlan (Using the start date of the current week: 2026-03-16)
+INSERT INTO MealPlan (mID, week_date, day, mealTime, recipeID)
 VALUES (5, '2026-03-16', 'Friday', 'Dinner', 10);
 
--- 9. ShoppingList
-INSERT INTO ShoppingList (itemID, ingreID, unit, qty, checked)
-VALUES (100, 201, 'lb', 1, 'no'),
-       (101, 202, 'bottle', 1, 'no');
+-- 7. ShoppingList
+INSERT INTO ShoppingList (itemID, recipeID, ingreID, checked)
+VALUES (100, 10, 201, 'no'),
+       (101, 10, 202, 'no');

@@ -35,24 +35,9 @@ CREATE TABLE Recipe_Tag (
     FOREIGN KEY (tagID) REFERENCES Tag(tagID)
 );
 
-CREATE TABLE Seasoning (
-    sID INT PRIMARY KEY,
-    seasoning VARCHAR(255) UNIQUE NOT NULL
-);
-
-CREATE TABLE Recipe_Seasoning (
-    recipeID INT,
-    sID INT,
-    qty VARCHAR(100) DEFAULT NULL,
-    unit VARCHAR(50) DEFAULT NULL,
-    PRIMARY KEY (recipeID, sID),
-    FOREIGN KEY (recipeID) REFERENCES Recipe(recipeID),
-    FOREIGN KEY (sID) REFERENCES Seasoning(sID)
-);
-
 CREATE TABLE MealPlan (
     mID INT PRIMARY KEY,
-    wID DATE NOT NULL,
+    week_date DATE NOT NULL,
     day VARCHAR(20) NOT NULL,
     mealTime VARCHAR(50) NOT NULL,
     recipeID INT,
@@ -61,9 +46,8 @@ CREATE TABLE MealPlan (
 
 CREATE TABLE ShoppingList (
     itemID INT PRIMARY KEY,
+    recipeID INT,
     ingreID INT,
-    unit VARCHAR(50),
-    qty NUMERIC NOT NULL,
     checked VARCHAR(10) DEFAULT 'no',
-    FOREIGN KEY (ingreID) REFERENCES Ingredient(ingreID)
+    FOREIGN KEY (recipeID, ingreID) REFERENCES Recipe_Ingredient(recipeID, ingreID)
 );
