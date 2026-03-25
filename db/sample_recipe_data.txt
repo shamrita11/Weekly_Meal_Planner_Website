@@ -1,6 +1,6 @@
 -- 1. Recipe
 INSERT INTO Recipe (recipeID, title, cook_time, instructions)
-VALUES (10, 'Spicy Garlic Shrimp', '15 min', '1. Mince garlic. 2. Sauté shrimp in olive oil. 3. Add garlic and red pepper flakes. 4. Serve hot.');
+VALUES (10, 'Spicy Garlic Shrimp', '15 min', '1. Mince garlic. 2. Sautee shrimp in olive oil. 3. Add garlic and red pepper flakes. 4. Serve hot.');
 
 -- 2. Ingredients
 INSERT INTO Ingredient (ingreID, ingredient)
@@ -8,9 +8,9 @@ VALUES (201, 'shrimp'),
        (202, 'olive oil');
 
 -- 3. Recipe_Ingredient
-INSERT INTO Recipe_Ingredient (recipeID, ingreID, qty, unit)
-VALUES (10, 201, 1, 'lb'),
-       (10, 202, 2, 'tbsp');
+INSERT INTO Recipe_Ingredient (recipeID, ingreID, amount)
+VALUES (10, 201,'1 lb'),
+       (10, 202, '2 tbsp');
 
 -- 4. Tags
 INSERT INTO Tag (tagID, tag)
