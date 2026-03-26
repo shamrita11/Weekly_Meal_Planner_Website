@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Profile — Weekly Meal Planner</title>
+  <link rel="stylesheet" href="../static/css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+<div id="page-profile" class="page active">
+  <nav class="nav nav-inner">
+    <div class="logo"><span class="logo-icon">👨‍🍳</span></div>
+    <div class="nav-links">
+      <button class="pill-btn sm" onclick="window.location.href='index.html#main'">Home</button>
+      <button class="pill-btn sm" onclick="window.location.href='index.html#recipes'">Recipes</button>
+      <button class="pill-btn sm" onclick="window.location.href='index.html#mealplan'">Meal Plan</button>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()">🌙 Dark</button>
+      <div class="profile-btn active-profile">👤</div>
+    </div>
+  </nav>
+
+  <div class="profile-layout">
+    <div class="card profile-card">
+      <div class="profile-avatar">👤</div>
+      <h2 class="profile-name" contenteditable="true" id="profile-name">Your Name</h2>
+      <p class="profile-email" contenteditable="true" id="profile-email">youremail@example.com</p>
+      <div class="profile-stats">
+        <div class="stat"><span id="stat-recipes">—</span><small>Recipes</small></div>
+        <div class="stat"><span id="stat-favs">—</span><small>Favourites</small></div>
+      </div>
+      <button class="pill-btn large" onclick="window.location.href='index.html'">Go to Login Page</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── THEME TOGGLE (mirrors index.html) ──
+  let isDark = localStorage.getItem('theme') !== 'light';
+
+  function applyTheme() {
+    document.body.classList.toggle('light', !isDark);
+    document.getElementById('theme-btn').textContent = isDark ? '🌙 Dark' : '☀️ Light';
+  }
+
+  function toggleTheme() {
+    isDark = !isDark;
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    applyTheme();
+  }
+
+  applyTheme();
+
+  // ── PERSIST NAME & EMAIL via localStorage ──
+  const nameEl = document.getElementById('profile-name');
+  const emailEl = document.getElementById('profile-email');
+
+  nameEl.textContent = localStorage.getItem('profile-name') || 'Your Name';
+  emailEl.textContent = localStorage.getItem('profile-email') || 'youremail@example.com';
+
+  nameEl.addEventListener('blur', () => localStorage.setItem('profile-name', nameEl.textContent));
+  emailEl.addEventListener('blur', () => localStorage.setItem('profile-email', emailEl.textContent));
+
+  // ── RECIPE STATS ──
+  document.getElementById('stat-recipes').textContent = localStorage.getItem('stat-recipes') ?? '0';
+  document.getElementById('stat-favs').textContent = localStorage.getItem('stat-favs') ?? '0';
+</script>
+</body>
+</html>
