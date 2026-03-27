@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="page-recipes" class="page active">
+  <nav class="nav nav-inner">
+    <div class="logo"><span class="logo-icon">👨‍🍳</span></div>
+    <div class="nav-links">
+      <button class="pill-btn sm" onclick="navigate('main')">Home</button>
+      <button class="pill-btn sm active-nav" onclick="navigate('recipes')">Recipes</button>
+      <button class="pill-btn sm" onclick="navigate('mealplan')">Meal Plan</button>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" onclick="toggleTheme()">🌙 Dark</button>
+      <div class="profile-btn" onclick="window.location.href='/profile'">👤</div>
+    </div>
+  </nav>
+
+  <div class="recipes-page-layout">
+    <div class="card recipes-full-card">
+      <div class="recipes-toolbar">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input id="recipe-search" class="search-input" placeholder="Search recipes…" oninput="filterRecipes()"/>
+          <button class="clear-search" onclick="clearSearch()">✕</button>
+        </div>
+        <button class="add-btn" onclick="openNewRecipe()" title="Add Recipe">+</button>
+      </div>
+
+      <div class="recipes-body">
+        <div class="recipes-group">
+          <span class="group-label">Favourites</span>
+          <div id="fav-grid" class="recipe-grid"></div>
+        </div>
+        <div class="recipes-group">
+          <span class="group-label">All Recipes</span>
+          <div id="all-grid" class="recipe-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

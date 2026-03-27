@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="page-recipe-form" class="page active">
+  <nav class="nav nav-inner">
+    <div class="logo"><span class="logo-icon">👨‍🍳</span></div>
+    <div class="nav-right">
+      <button class="theme-toggle" onclick="toggleTheme()">🌙 Dark</button>
+      <div class="profile-btn" onclick="window.location.href='/profile'">👤</div>
+    </div>
+  </nav>
+
+  <div class="form-layout">
+    <h2 id="form-title" class="form-heading">New Recipe</h2>
+    <div class="card form-card">
+      <div class="form-row"><label class="form-label pill-label">Recipe Name*</label><input id="f-name" class="form-input" placeholder="e.g. Fried Rice"/></div>
+      <div class="form-row"><label class="form-label pill-label">Ingredients*</label><textarea id="f-ingredients" class="form-textarea" placeholder="1 cup rice&#10;1 onion&#10;…"></textarea></div>
+      <div class="form-row"><label class="form-label pill-label">Estimated Time To Make</label><input id="f-time" class="form-input" placeholder="e.g. 30 minutes"/></div>
+      <div class="form-row"><label class="form-label pill-label">Tags*<br/><small>(keywords for search)</small></label><input id="f-tags" class="form-input" placeholder="e.g. dinner, asian, rice"/></div>
+      <div class="form-row"><label class="form-label pill-label">Instructions*</label><textarea id="f-instructions" class="form-textarea" placeholder="1. Boil water…&#10;2. …"></textarea></div>
+      <div class="form-row"><label class="form-label pill-label">Image*</label>
+        <div class="upload-wrap">
+          <input type="file" id="f-image-file" accept="image/*" style="display:none" onchange="previewImage(event)"/>
+          <button class="upload-btn" onclick="document.getElementById('f-image-file').click()">⬆ Upload</button>
+          <span id="f-image-name" class="upload-name">No file chosen</span>
+          <img id="f-image-preview" src="" style="display:none;max-height:80px;border-radius:8px;margin-left:10px"/>
+        </div>
+      </div>
+    </div>
+    <div class="form-footer">
+      <label class="fav-label"><input type="checkbox" id="f-fav"/> ⭐ Save to Favourites</label>
+      <div class="form-footer-right">
+        <button id="f-delete-btn" class="pill-btn sm danger" style="display:none" onclick="deleteRecipe()">🗑 Delete Recipe</button>
+        <button class="pill-btn sm" onclick="navigate('recipes')">Cancel</button>
+        <button class="pill-btn sm primary" onclick="saveRecipe()">Submit</button>
+      </div>
+    </div>
+    <input type="hidden" id="f-editing-id" value=""/>
+  </div>
+</div>
+{% endblock %}
