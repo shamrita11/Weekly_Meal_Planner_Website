@@ -12,6 +12,7 @@ def get_db_connection():
 # -- CRUD (Save, Load, Update, Delete) of 
 # tables{Recipe, Ingreident, Recipe_Ingredient, Tag, Recipe_Tag} --
 
+# Load -- Corresponding js function is loadRecipesFromDB
 @recipe_bp.route('/recipe/get', methods=['GET'])
 def get_recipes():
     conn = get_db_connection()
@@ -69,6 +70,7 @@ def get_recipes():
     finally:
         conn.close()
 
+# Save -- Corresponding js func is saveRecipe(), createNewRecipe
 @recipe_bp.route('/recipe/save', methods=['POST'])
 def save_recipe():
     data = request.get_json()
@@ -139,7 +141,7 @@ def save_recipe():
     finally:
         conn.close()
 
-
+# Delete -- Corresponding js function is deleteRecipe
 @recipe_bp.route('/recipe/delete/<int:recipe_id>', methods=['DELETE'])
 def delete_recipe(recipe_id):
     conn = get_db_connection()
@@ -163,6 +165,7 @@ def delete_recipe(recipe_id):
     finally:
         conn.close()
 
+# Update -- The corresponding js func is saveRecipe, updateExistingRecipe
 @recipe_bp.route('/recipe/update/<int:recipe_id>', methods=['PUT'])
 def update_recipe(recipe_id):
     data = request.get_json()
