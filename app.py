@@ -1,10 +1,12 @@
 from flask import Flask, render_template
-from recipe_routes import recipe_bp 
+from recipe_routes import recipe_bp
+from mealplan_routes import mealplan_bp 
 
 app = Flask(__name__)
 
-# Register the blueprint
+# Register the blueprints
 app.register_blueprint(recipe_bp)
+app.register_blueprint(mealplan_bp)
 
 @app.route('/')
 def index():

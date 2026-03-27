@@ -13,6 +13,15 @@ let mealPlans = {};
 let mainWeekOffset = 0;
 let mpWeekOffset = 0;
 
+let shoppingList = ["Eggs", "Bread", "Blueberries", "Lettuce"];
+
+let nextId = 3;
+let currentModalRecipeId = null;
+let pendingCell = null; // { dayIdx, mealIdx, gridId, weekOffset }
+
+const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const MEALS = ["Breakfast","Lunch","Dinner"];
+
 function getMonday(offset) {
   const now = new Date();
   const day = now.getDay(); // 0=Sun
@@ -46,15 +55,6 @@ function getWeekLabel(offset) {
   const label = offset === 0 ? 'This Week' : offset === -1 ? 'Last Week' : offset === 1 ? 'Next Week' : '';
   return (label ? label + ' · ' : '') + fmt(monday) + ' – ' + fmt(sunday);
 }
-
-let shoppingList = ["Eggs", "Bread", "Blueberries", "Lettuce"];
-
-let nextId = 3;
-let currentModalRecipeId = null;
-let pendingCell = null; // { dayIdx, mealIdx, gridId, weekOffset }
-
-const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-const MEALS = ["Breakfast","Lunch","Dinner"];
 
 // ══════════════════ NAVIGATION (Updated for Flask) ══════════════════
 function navigate(target) {
@@ -183,8 +183,10 @@ function renderPlanGrid(gridId, weekOffset) {
   DAYS.forEach(d => grid.appendChild(makeCell(d, 'header-cell')));
 
   MEALS.forEach((meal, mealIdx) => {
+    // mealIdx is 0 (Breakfast), 1 (Lunch), or 2 (Dinner)
     grid.appendChild(makeCell(meal, 'row-label plan-cell'));
     DAYS.forEach((_, dayIdx) => {
+      // dayIdx is 0 (Monday) through 6 (Sunday)
       const cell = document.createElement('div');
       cell.className = 'plan-cell meal-cell';
       const recipeId = plan[dayIdx][mealIdx];
@@ -280,11 +282,46 @@ function renderCellPickerGrid(query) {
 
 function assignRecipeToCell(recipeId) {
   if (!pendingCell) return;
-  const plan = getMealPlan(pendingCell.weekOffset || 0);
-  plan[pendingCell.dayIdx][pendingCell.mealIdx] = recipeId;
-  document.getElementById('cell-picker').classList.remove('open');
-  renderPlanGrid(pendingCell.gridId, pendingCell.weekOffset || 0);
-  pendingCell = null;
+  
+  // 1. Calculate the exact coordinates of the cell
+  const weekDate = weekKey(pendingCell.weekOffset || 0); // e.g., "2026-03-16"
+  const dayName = DAYS[pendingCell.dayIdx];              // e.g., "Monday"
+  const mealName = MEALS[pendingCell.mealIdx];           // e.g., "Breakfast"
+
+  // 2. Package the payload for the database
+  const payload = {
+    week_date: weekDate,
+    day: dayName,
+    meal_type: mealName,
+    recipe_id: recipeId // This will be null if the user clicked "Clear"
+  };
+
+  // 3. Send the POST request to the backend
+  fetch('/mealplan/sync', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === 'success') {
+      // Only update the UI if the database successfully saved the change
+      const plan = getMealPlan(pendingCell.weekOffset || 0);
+      plan[pendingCell.dayIdx][pendingCell.mealIdx] = recipeId;
+      
+      document.getElementById('cell-picker').classList.remove('open');
+      renderPlanGrid(pendingCell.gridId, pendingCell.weekOffset || 0);
+      pendingCell = null;
+    } else {
+      alert('Database Error: ' + data.message);
+    }
+  })
+  .catch(error => {
+    console.error('Error saving to MealPlan:', error);
+    alert('Failed to connect to the server.');
+  });
 }
 
 // ══════════════════ RECIPES PAGE ══════════════════
@@ -557,20 +594,20 @@ function saveRecipe() {
     return;
   }
 
-  // ------------------- NEED REFACTORED For Recipe-save ---------------------------------------//
+  // ------------------- NEED REFACTORED For Recipe-save ----------------------------------------------------------//
   // We atcually don't want users to use '\n' and ',' to split the ingredients
   // Instead, we can use a table-like format to get the input
   // Also, for ingredients, we need two column -- one for amount, one for ingredient's name
   // So the UI may look like:
   //              ------------------------------
-  // Ingredients: | (amount) | (ingredient)    | <-- A list of tuple: list{(amount, ingredient)}
+  // Ingredients: | (amount) | (ingredient)    | <-- A list of tuple: list{(amount, ingredient)}, where amount and ingr are both strings
   //              ------------------------------     In js, it's array of arrays [["1 cup", "rice"], ["2", "onions"]]
   //              |____________+_______________ | <- tap to add a new ingredient
   //
   //       __________________
   //  Tag: |_Tag_____|__+____| <-- A list of tags
   //
-  // Once you done that in html, can you also make a change to the following code:
+  // Once you done that in html, can you also fix the following code:
  const ingredients = ingredientsRaw.split('\n').map(s => { // No longer use split by '\n'
     const parts = s.trim().toLowerCase();
     const amount;
@@ -650,7 +687,7 @@ function toggleTheme() {
   document.querySelectorAll('.theme-toggle').forEach(btn => btn.textContent = label);
 }
 
-// ══════════════════ INIT (Updated for Flask) ══════════════════
+// ════════════════════════════ INIT  ════════════════════════════
 function loadRecipesFromDB(callback) {
   fetch('/recipe/get')
     .then(response => response.json())
@@ -664,6 +701,42 @@ function loadRecipesFromDB(callback) {
     })
     .catch(error => {
       console.error('Error fetching recipes:', error);
+    });
+}
+
+function loadMealPlansFromDB(callback) {
+  fetch('/mealplan/get')
+    .then(response => response.json())
+    .then(data => {
+      if (data.status === 'success') {
+        // Reset the local meal plans object
+        mealPlans = {};
+        
+        data.mealplans.forEach(plan => {
+          const weekKey = plan.week_date;
+          // Translate "Monday" back to 0, "Breakfast" back to 0, etc.
+          const dayIdx = DAYS.indexOf(plan.day);
+          const mealIdx = MEALS.indexOf(plan.meal_type);
+          
+          // Ensure valid indexes were found before assigning
+          if (dayIdx !== -1 && mealIdx !== -1) {
+            // If this week doesn't exist in our local object yet, initialize it
+            if (!mealPlans[weekKey]) {
+              mealPlans[weekKey] = Array.from({length:7}, () => [null,null,null]);
+            }
+            // Slot the recipe ID into the exact grid coordinate
+            mealPlans[weekKey][dayIdx][mealIdx] = plan.recipe_id;
+          }
+        });
+        
+        // Execute the next step (rendering the UI)
+        if (callback) callback();
+      } else {
+        console.error('Failed to load meal plans:', data.message);
+      }
+    })
+    .catch(error => {
+      console.error('Error fetching meal plans:', error);
     });
 }
 
@@ -684,8 +757,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   };
 
-  // Fetch data first, THEN initialize the UI!
-  loadRecipesFromDB(initializePageUI);
+  // 1. Fetch Recipes first
+  loadRecipesFromDB(() => {
+    // 2. Then fetch Meal Plans
+    loadMealPlansFromDB(() => {
+      // 3. Finally, render the UI with all the data ready
+      initializePageUI();
+    });
+  });
 });
 
 // ══════════════════ RESIZE HANDLE ══════════════════
