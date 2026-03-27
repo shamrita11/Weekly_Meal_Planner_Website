@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Weekly Meal Planner</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+  {% block content %}
+  {% endblock %}
+
+	<!-- ════════════════════ RECIPE DETAIL MODAL ════════════════════ -->
+  <div id="recipe-modal" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal-box">
+      <div class="modal-top-bar">
+        <button class="modal-close" onclick="closeRecipeModal()">✕</button>
+        <span id="modal-recipe-name" class="modal-title-bar"></span>
+      </div>
+      <div class="modal-body">
+        <div class="modal-left">
+          <h2 id="modal-name" class="modal-name"></h2>
+          <p><strong>Ingredients:</strong></p>
+          <ul id="modal-ingredients" class="modal-list"></ul>
+          <p><strong>Instructions:</strong></p>
+          <p id="modal-instructions" class="modal-instructions"></p>
+          <p class="modal-time">⏱ Estimated Time: <span id="modal-time"></span></p>
+          <div class="modal-actions">
+            <button class="pill-btn sm" onclick="editCurrentRecipe()">Edit Recipe</button>
+            <button id="modal-fav-btn" class="pill-btn sm fav-toggle-btn" onclick="toggleModalFavourite()">⭐ Add to Favourites</button>
+          </div>
+        </div>
+        <div class="modal-right">
+          <img id="modal-img" src="" alt="" class="modal-img"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+	<!-- ════════════════════ CELL PICKER MODAL ════════════════════ -->
+  <div id="cell-picker" class="modal-overlay" onclick="closeCellPicker(event)">
+    <div class="cell-picker-box">
+      <div class="picker-top">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input id="cell-search" class="search-input" placeholder="Search recipes…" oninput="filterCellPicker()"/>
+          <button class="clear-search" onclick="document.getElementById('cell-search').value='';filterCellPicker()">✕</button>
+        </div>
+      </div>
+      <div id="cell-picker-grid" class="cell-grid"></div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

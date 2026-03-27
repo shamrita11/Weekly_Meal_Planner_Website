@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="page-mealplan" class="page active">
+  <nav class="nav nav-inner">
+    <div class="logo"><span class="logo-icon">👨‍🍳</span></div>
+    <div class="nav-links">
+      <button class="pill-btn sm" onclick="navigate('main')">Home</button>
+      <button class="pill-btn sm" onclick="navigate('recipes')">Recipes</button>
+      <button class="pill-btn sm active-nav" onclick="navigate('mealplan')">Meal Plan</button>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" onclick="toggleTheme()">🌙 Dark</button>
+      <div class="profile-btn" onclick="window.location.href='/profile'">👤</div>
+    </div>
+  </nav>
+
+  <div class="mealplan-layout">
+    <div class="card mealplan-card">
+      <div class="section-header">
+        <div class="week-header-row">
+          <button class="week-side-btn" id="mp-prev-week" onclick="mpChangeWeek(-1)" title="Previous week">&#10094;</button>
+          <span id="mp-week-label">Loading…</span>
+          <button class="week-side-btn" id="mp-next-week" onclick="mpChangeWeek(1)" title="Next week">&#10095;</button>
+        </div>
+      </div>
+      <div class="plan-grid" id="mealplan-grid"></div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

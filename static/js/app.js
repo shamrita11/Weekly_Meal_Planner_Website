@@ -76,21 +76,16 @@ let pendingCell = null; // { dayIdx, mealIdx, gridId, weekOffset }
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const MEALS = ["Breakfast","Lunch","Dinner"];
 
-// ══════════════════ NAVIGATION ══════════════════
+// ══════════════════ NAVIGATION (Updated for Flask) ══════════════════
 function navigate(target) {
-  document.querySelectorAll('.page').forEach(p => {
-    p.classList.remove('active');
-    p.style.display = 'none';
-  });
-  const el = document.getElementById('page-' + target);
-  if (el) {
-    el.style.display = 'flex';
-    el.classList.add('active');
-  }
-
-  if (target === 'main')     { renderMainPage(); }
-  if (target === 'recipes')  { renderRecipesPage(); }
-  if (target === 'mealplan') { renderMealPlanPage(); }
+  const routes = {
+    'home': '/',
+    'main': '/dashboard',
+    'recipes': '/recipes',
+    'mealplan': '/mealplan',
+    'recipe-form': '/recipe/new'
+  };
+  window.location.href = routes[target] || '/';
 }
 
 // ══════════════════ MAIN PAGE ══════════════════
@@ -580,9 +575,22 @@ function toggleTheme() {
   const label = isDark ? '🌙 Dark' : '☀️ Light';
   document.querySelectorAll('.theme-toggle').forEach(btn => btn.textContent = label);
 }
-// ══════════════════ INIT ══════════════════
-const startPage = window.location.hash.replace('#', '') || 'home';
-navigate(startPage);
+// ══════════════════ INIT (Updated for Flask) ══════════════════
+document.addEventListener('DOMContentLoaded', function() {
+  const path = window.location.pathname;
+
+  // Run the correct render function based on the Flask URL
+  if (path === '/dashboard') {
+    renderMainPage();
+  } else if (path === '/recipes') {
+    renderRecipesPage();
+  } else if (path === '/mealplan') {
+    renderMealPlanPage();
+  } else if (path === '/recipe/new') {
+    const delBtn = document.getElementById('f-delete-btn');
+    if (delBtn) delBtn.style.display = 'none';
+  }
+});
 
 // ══════════════════ RESIZE HANDLE ══════════════════
 let dragging = false;

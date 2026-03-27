@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="page-main" class="page active">
+  <nav class="nav nav-inner">
+    <div class="logo"><span class="logo-icon">👨‍🍳</span></div>
+    <div class="nav-links">
+      <button class="pill-btn sm active-nav" onclick="navigate('main')">Home</button>
+      <button class="pill-btn sm" onclick="navigate('recipes')">Recipes</button>
+      <button class="pill-btn sm" onclick="navigate('mealplan')">Meal Plan</button>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" onclick="toggleTheme()">🌙 Dark</button>
+      <div class="profile-btn" onclick="window.location.href='/profile'">👤</div>
+    </div>
+  </nav>
+
+  <div class="main-layout">
+    <div class="main-content">
+
+      <!-- WEEKLY MEAL PLAN -->
+      <section class="card plan-section">
+        <div class="section-header">
+          <div class="week-header-row">
+            <button class="week-side-btn" id="main-prev-week" onclick="mainChangeWeek(-1)" title="Previous week">&#10094;</button>
+            <span id="main-week-label">Loading…</span>
+            <button class="week-side-btn" id="main-next-week" onclick="mainChangeWeek(1)" title="Next week">&#10095;</button>
+          </div>
+        </div>
+        <div class="plan-grid" id="main-plan-grid"></div>
+      </section>
+
+      <!-- DRAG HANDLE -->
+      <div id="resize-handle" class="resize-handle" title="Drag to resize">
+        <div class="resize-handle-bar"></div>
+      </div>
+
+      <!-- YOUR RECIPES -->
+      <section class="card recipes-section">
+        <div class="section-header">Your Recipes</div>
+        <div class="recipe-strip">
+          <div id="main-recipe-list" class="recipe-thumbs"></div>
+          <div class="strip-controls">
+            <button class="icon-btn" onclick="scrollRecipeStrip(-1)">&#8963;</button>
+            <button class="icon-btn" onclick="scrollRecipeStrip(1)">&#8964;</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- SHOPPING LIST -->
+    <aside class="sidebar">
+      <div class="card sidebar-card">
+        <div class="section-header sm-header">Shopping List</div>
+        <ul id="shopping-list" class="shop-list"></ul>
+        <input id="shop-input" class="shop-input" placeholder="Add item…" onkeydown="addShopItem(event)"/>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
