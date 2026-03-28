@@ -2,28 +2,8 @@
 //  WEEKLY MEAL PLANNER — app.js
 // ══════════════════════════════════════════
 
-// ── SAMPLE STARTER DATA ──
-let recipes = [
-  {
-    id: 1,
-    name: "French Toast",
-    ingredients: ["2 slices bread", "1 egg", "¼ cup milk", "1 tsp sugar", "Berries to serve"],
-    instructions: "1. Whisk egg, milk, and sugar. 2. Dip bread. 3. Fry in butter 2 min per side. 4. Serve with berries.",
-    time: "15 minutes",
-    tags: ["breakfast", "sweet", "bread", "egg"],
-    favourite: true,
-  },
-  {
-    id: 2,
-    name: "Garden Salad",
-    ingredients: ["2 cups lettuce", "½ cup cherry tomatoes", "¼ cucumber", "Dressing"],
-    instructions: "1. Wash and chop veggies. 2. Toss together. 3. Drizzle dressing.",
-    time: "10 minutes",
-    tags: ["lunch", "salad", "healthy", "vegetarian"],
-    favourite: true,
-    image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=300&q=80"
-  }
-];
+// ── DATA FROM DATABASE ──
+let recipes = [];
 
 // mealPlans[weekKey][day][meal] = recipeId
 // weekKey = ISO Monday date string e.g. "2026-03-16"
@@ -32,6 +12,15 @@ let mealPlans = {};
 // Current week offsets (0 = this week, -1 = last week, +1 = next week, etc.)
 let mainWeekOffset = 0;
 let mpWeekOffset = 0;
+
+let shoppingList = ["Eggs", "Bread", "Blueberries", "Lettuce"];
+
+let nextId = 3;
+let currentModalRecipeId = null;
+let pendingCell = null; // { dayIdx, mealIdx, gridId, weekOffset }
+
+const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const MEALS = ["Breakfast","Lunch","Dinner"];
 
 function getMonday(offset) {
   const now = new Date();
@@ -66,15 +55,6 @@ function getWeekLabel(offset) {
   const label = offset === 0 ? 'This Week' : offset === -1 ? 'Last Week' : offset === 1 ? 'Next Week' : '';
   return (label ? label + ' · ' : '') + fmt(monday) + ' – ' + fmt(sunday);
 }
-
-let shoppingList = ["Eggs", "Bread", "Blueberries", "Lettuce"];
-
-let nextId = 3;
-let currentModalRecipeId = null;
-let pendingCell = null; // { dayIdx, mealIdx, gridId, weekOffset }
-
-const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-const MEALS = ["Breakfast","Lunch","Dinner"];
 
 // ══════════════════ NAVIGATION (Updated for Flask) ══════════════════
 function navigate(target) {
@@ -203,8 +183,10 @@ function renderPlanGrid(gridId, weekOffset) {
   DAYS.forEach(d => grid.appendChild(makeCell(d, 'header-cell')));
 
   MEALS.forEach((meal, mealIdx) => {
+    // mealIdx is 0 (Breakfast), 1 (Lunch), or 2 (Dinner)
     grid.appendChild(makeCell(meal, 'row-label plan-cell'));
     DAYS.forEach((_, dayIdx) => {
+      // dayIdx is 0 (Monday) through 6 (Sunday)
       const cell = document.createElement('div');
       cell.className = 'plan-cell meal-cell';
       const recipeId = plan[dayIdx][mealIdx];
@@ -300,11 +282,46 @@ function renderCellPickerGrid(query) {
 
 function assignRecipeToCell(recipeId) {
   if (!pendingCell) return;
-  const plan = getMealPlan(pendingCell.weekOffset || 0);
-  plan[pendingCell.dayIdx][pendingCell.mealIdx] = recipeId;
-  document.getElementById('cell-picker').classList.remove('open');
-  renderPlanGrid(pendingCell.gridId, pendingCell.weekOffset || 0);
-  pendingCell = null;
+  
+  // 1. Calculate the exact coordinates of the cell
+  const weekDate = weekKey(pendingCell.weekOffset || 0); // e.g., "2026-03-16"
+  const dayName = DAYS[pendingCell.dayIdx];              // e.g., "Monday"
+  const mealName = MEALS[pendingCell.mealIdx];           // e.g., "Breakfast"
+
+  // 2. Package the payload for the database
+  const payload = {
+    week_date: weekDate,
+    day: dayName,
+    meal_type: mealName,
+    recipe_id: recipeId // This will be null if the user clicked "Clear"
+  };
+
+  // 3. Send the POST request to the backend
+  fetch('/mealplan/sync', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === 'success') {
+      // Only update the UI if the database successfully saved the change
+      const plan = getMealPlan(pendingCell.weekOffset || 0);
+      plan[pendingCell.dayIdx][pendingCell.mealIdx] = recipeId;
+      
+      document.getElementById('cell-picker').classList.remove('open');
+      renderPlanGrid(pendingCell.gridId, pendingCell.weekOffset || 0);
+      pendingCell = null;
+    } else {
+      alert('Database Error: ' + data.message);
+    }
+  })
+  .catch(error => {
+    console.error('Error saving to MealPlan:', error);
+    alert('Failed to connect to the server.');
+  });
 }
 
 // ══════════════════ RECIPES PAGE ══════════════════
@@ -507,6 +524,61 @@ function previewImage(event) {
   reader.readAsDataURL(file);
 }
 
+function updateExistingRecipe(editingId, recipeData) {
+  // Send the PUT request to update the database
+  fetch(`/recipe/update/${editingId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(recipeData)
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === 'success') {
+      // Only update the local UI array if the database update succeeded
+      // Find the old recipe and update it cleanly using Object.assign
+      const r = recipes.find(x => x.id === parseInt(editingId));
+      if (r) {
+        Object.assign(r, recipeData); 
+      }
+      syncStats();
+      navigate('recipes');
+    } else {
+      alert('Database Error: ' + data.message);
+    }
+  })
+  .catch(error => {
+    console.error('Error updating DB:', error);
+    alert('Failed to connect to the server.');
+  });
+}
+
+function createNewRecipe(recipeData) {
+  // Send the POST request insert a new tuple
+  fetch('/recipe/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(recipeData)
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === 'success') {
+      // Attach the new DB-generated ID to the object and push it to the UI array
+      recipeData.id = data.recipeID;
+      // Push to local array using the real ID generated by the database so UI updates instantly
+      recipes.push(recipeData); 
+      
+      syncStats();
+      navigate('recipes');
+    } else {
+      alert('Database Error: ' + data.message);
+    }
+  })
+  .catch(error => {
+    console.error('Error saving to DB:', error);
+    alert('Failed to connect to the server.');
+  });
+}
+
 function saveRecipe() {
   const name = document.getElementById('f-name').value.trim();
   const ingredientsRaw = document.getElementById('f-ingredients').value.trim();
@@ -517,47 +589,86 @@ function saveRecipe() {
   const editingId = document.getElementById('f-editing-id').value;
   const imagePreview = document.getElementById('f-image-preview');
 
-  if (!name || !ingredientsRaw || !instructions) {
-    alert('Please fill in Recipe Name, Ingredients, and Instructions.');
+  if (!name || !ingredientsRaw) {
+    alert('Please fill in Recipe title and Ingredients.');
     return;
   }
 
-  const ingredients = ingredientsRaw.split('\n').map(s => s.trim()).filter(Boolean);
-  const tags = tagsRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  // ------------------- NEED REFACTORED For Recipe-save ----------------------------------------------------------//
+  // We atcually don't want users to use '\n' and ',' to split the ingredients
+  // Instead, we can use a table-like format to get the input
+  // Also, for ingredients, we need two column -- one for amount, one for ingredient's name
+  // So the UI may look like:
+  //              ------------------------------
+  // Ingredients: | (amount) | (ingredient)    | <-- A list of tuple: list{(amount, ingredient)}, where amount and ingr are both strings
+  //              ------------------------------     In js, it's array of arrays [["1 cup", "rice"], ["2", "onions"]]
+  //              |____________+_______________ | <- tap to add a new ingredient
+  //
+  //       __________________
+  //  Tag: |_Tag_____|__+____| <-- A list of tags
+  //
+  // Once you done that in html, can you also fix the following code:
+ const ingredients = ingredientsRaw.split('\n').map(s => { // No longer use split by '\n'
+    const parts = s.trim().toLowerCase();
+    const amount;
+    const ingName;
+    return { amount: amount || '', name: ingName || '' };
+  }).filter(item => item.name !== ''); 
+
+  const tags = tagsRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean); // No longer use split by ','
   const imageData = imagePreview.src && imagePreview.style.display !== 'none' ? imagePreview.src : '';
 
-  if (editingId) {
-    const r = recipes.find(x => x.id === parseInt(editingId));
-    if (r) {
-      r.name = name;
-      r.ingredients = ingredients;
-      r.time = time;
-      r.tags = tags;
-      r.instructions = instructions;
-      r.favourite = fav;
-      if (imageData) r.image = imageData;
-    }
-  } else {
-    recipes.push({ id: nextId++, name, ingredients, time, tags, instructions, favourite: fav, image: imageData });
-  }
+  const recipeData = {
+    name: name,
+    ingredients: ingredients,
+    time: time,
+    tags: tags,
+    instructions: instructions,
+    favourite: fav,
+    image: imageData
+  };
 
-  syncStats();
-  navigate('recipes');
+  if (editingId) {
+    updateExistingRecipe(editingId, recipeData);
+  } else {
+    createNewRecipe(recipeData);
+  }
 }
 
+
+// I'll revisit it later especially for meal plan part
 function deleteRecipe() {
   const editingId = parseInt(document.getElementById('f-editing-id').value);
   if (!editingId) return;
   if (!confirm('Remove this recipe?')) return;
-  recipes = recipes.filter(r => r.id !== editingId);
-  // Clear from all meal plans
-  Object.values(mealPlans).forEach(week => {
-    week.forEach(day => {
-      day.forEach((v, i) => { if (v === editingId) day[i] = null; });
-    });
+
+  // Send a DELETE request to the Flask backend
+  fetch(`/recipe/delete/${editingId}`, {
+    method: 'DELETE'
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === 'success') {
+      // If the database successfully deleted it, remove it from the UI array
+      recipes = recipes.filter(r => r.id !== editingId);
+      
+      // Clear from all local meal plans so the UI updates instantly
+      Object.values(mealPlans).forEach(week => {
+        week.forEach(day => {
+          day.forEach((v, i) => { if (v === editingId) day[i] = null; });
+        });
+      });
+      
+      syncStats();
+      navigate('recipes');
+    } else {
+      alert('Database Error: ' + data.message);
+    }
+  })
+  .catch(error => {
+    console.error('Error deleting recipe:', error);
+    alert('Failed to connect to the server.');
   });
-  syncStats();
-  navigate('recipes');
 }
 
 // ══════════════════ PROFILE STATS ══════════════════
@@ -575,21 +686,85 @@ function toggleTheme() {
   const label = isDark ? '🌙 Dark' : '☀️ Light';
   document.querySelectorAll('.theme-toggle').forEach(btn => btn.textContent = label);
 }
-// ══════════════════ INIT (Updated for Flask) ══════════════════
+
+// ════════════════════════════ INIT  ════════════════════════════
+function loadRecipesFromDB(callback) {
+  fetch('/recipe/get')
+    .then(response => response.json())
+    .then(data => {
+      if (data.status === 'success') {
+        recipes = data.recipes; // Populate the global recipes array with DB data
+        if (callback) callback(); // Run the page render functions now that we have data
+      } else {
+        console.error('Failed to load recipes:', data.message);
+      }
+    })
+    .catch(error => {
+      console.error('Error fetching recipes:', error);
+    });
+}
+
+function loadMealPlansFromDB(callback) {
+  fetch('/mealplan/get')
+    .then(response => response.json())
+    .then(data => {
+      if (data.status === 'success') {
+        // Reset the local meal plans object
+        mealPlans = {};
+        
+        data.mealplans.forEach(plan => {
+          const weekKey = plan.week_date;
+          // Translate "Monday" back to 0, "Breakfast" back to 0, etc.
+          const dayIdx = DAYS.indexOf(plan.day);
+          const mealIdx = MEALS.indexOf(plan.meal_type);
+          
+          // Ensure valid indexes were found before assigning
+          if (dayIdx !== -1 && mealIdx !== -1) {
+            // If this week doesn't exist in our local object yet, initialize it
+            if (!mealPlans[weekKey]) {
+              mealPlans[weekKey] = Array.from({length:7}, () => [null,null,null]);
+            }
+            // Slot the recipe ID into the exact grid coordinate
+            mealPlans[weekKey][dayIdx][mealIdx] = plan.recipe_id;
+          }
+        });
+        
+        // Execute the next step (rendering the UI)
+        if (callback) callback();
+      } else {
+        console.error('Failed to load meal plans:', data.message);
+      }
+    })
+    .catch(error => {
+      console.error('Error fetching meal plans:', error);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   const path = window.location.pathname;
 
-  // Run the correct render function based on the Flask URL
-  if (path === '/dashboard') {
-    renderMainPage();
-  } else if (path === '/recipes') {
-    renderRecipesPage();
-  } else if (path === '/mealplan') {
-    renderMealPlanPage();
-  } else if (path === '/recipe/new') {
-    const delBtn = document.getElementById('f-delete-btn');
-    if (delBtn) delBtn.style.display = 'none';
-  }
+  // We wrap the page rendering in a function so we can pass it as a callback
+  const initializePageUI = () => {
+    if (path === '/dashboard') {
+      renderMainPage();
+    } else if (path === '/recipes') {
+      renderRecipesPage();
+    } else if (path === '/mealplan') {
+      renderMealPlanPage();
+    } else if (path === '/recipe/new') {
+      const delBtn = document.getElementById('f-delete-btn');
+      if (delBtn) delBtn.style.display = 'none';
+    }
+  };
+
+  // 1. Fetch Recipes first
+  loadRecipesFromDB(() => {
+    // 2. Then fetch Meal Plans
+    loadMealPlansFromDB(() => {
+      // 3. Finally, render the UI with all the data ready
+      initializePageUI();
+    });
+  });
 });
 
 // ══════════════════ RESIZE HANDLE ══════════════════
