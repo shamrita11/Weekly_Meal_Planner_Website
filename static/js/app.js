@@ -448,18 +448,46 @@ function closeModal(e) {
 
 function toggleModalFavourite() {
   if (!currentModalRecipeId) return;
+  
   const r = recipes.find(x => x.id === currentModalRecipeId);
   if (!r) return;
-  r.favourite = !r.favourite;
-  const favBtn = document.getElementById('modal-fav-btn');
-  if (r.favourite) {
-    favBtn.textContent = '★ Favourited';
-    favBtn.classList.add('is-fav');
-  } else {
-    favBtn.textContent = '⭐ Add to Favourites';
-    favBtn.classList.remove('is-fav');
-  }
-  syncStats();
+
+  // Send a POST request to the backend to toggle the status
+  fetch(`/recipe/toggle-fav/${currentModalRecipeId}`, {
+    method: 'POST'
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === 'success') {
+      // Update the local array
+      r.favourite = data.favourite;
+      
+      // Update the UI button inside the modal
+      const favBtn = document.getElementById('modal-fav-btn');
+      if (r.favourite) {
+        favBtn.textContent = '★ Favourited';
+        favBtn.classList.add('is-fav');
+      } else {
+        favBtn.textContent = '⭐ Add to Favourites';
+        favBtn.classList.remove('is-fav');
+      }
+      
+      // Sync stats to localStorage
+      syncStats();
+
+      // If we are on the Recipes page, re-render the grid so the recipe 
+      // instantly appears/disappears from the "Favourites" section
+      if (window.location.pathname === '/recipes') {
+        filterRecipes();
+      }
+    } else {
+      alert('Database Error: ' + data.message);
+    }
+  })
+  .catch(error => {
+    console.error('Error toggling favourite:', error);
+    alert('Failed to connect to the server.');
+  });
 }
 
 function editCurrentRecipe() {
