@@ -16,6 +16,7 @@ def get_current_user():
 
 
 # ── Load all recipes for the current user ──
+# The Corresponding js function that sends the request is loadRecipesFromDB
 @recipe_bp.route('/recipe/get', methods=['GET'])
 def get_recipes():
     uid = get_current_user()
@@ -35,6 +36,7 @@ def get_recipes():
         for r_row in recipe_rows:
             recipe_id = r_row['recipeID']
 
+            # Grab ingredients for this recipe
             cursor.execute('''
                 SELECT ri.amount, i.ingredient 
                 FROM Recipe_Ingredient ri
@@ -44,6 +46,7 @@ def get_recipes():
             ing_rows = cursor.fetchall()
             ingredients = [[row['amount'], row['ingredient']] for row in ing_rows]
 
+            # Grab tags for this recipe
             cursor.execute('''
                 SELECT t.tag 
                 FROM Recipe_Tag rt
@@ -53,6 +56,7 @@ def get_recipes():
             tag_rows = cursor.fetchall()
             tags = [row['tag'] for row in tag_rows]
 
+            # Construct the dictionary to match the js structure
             recipes_data.append({
                 "id": recipe_id,
                 "name": r_row['title'],
@@ -73,6 +77,7 @@ def get_recipes():
 
 
 # ── Save a new recipe ──
+# The corresponding js func is saveRecipe(), createNewRecipe
 @recipe_bp.route('/recipe/save', methods=['POST'])
 def save_recipe():
     uid = get_current_user()
@@ -93,12 +98,15 @@ def save_recipe():
     cursor = conn.cursor()
 
     try:
+        # Insert into Recipe table
         cursor.execute('''
             INSERT INTO Recipe (userID, title, favorites, cook_time, instructions, image)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (uid, title, favorites, cook_time, instructions, image))
         recipe_id = cursor.lastrowid
 
+        # Insert into Ingredient and Recipe_Ingredient tables
+        # EXPECTING ingredients to be a list of lists/tuples: [['1 cup', 'rice'], ['2', 'onions']]
         for ing_amount, ing_name in ingredients:
             ing_name = ing_name.strip()
             if not ing_name:
@@ -117,6 +125,7 @@ def save_recipe():
                 VALUES (?, ?, ?)
             ''', (recipe_id, ing_id, ing_amount))
 
+        # Insert into Tag and Recipe_Tag tables
         for t in tags:
             t = t.strip()
             if not t:
@@ -142,6 +151,7 @@ def save_recipe():
 
 
 # ── Delete a recipe ──
+# The corresponding js function is deleteRecipe
 @recipe_bp.route('/recipe/delete/<int:recipe_id>', methods=['DELETE'])
 def delete_recipe(recipe_id):
     uid = get_current_user()
@@ -157,9 +167,11 @@ def delete_recipe(recipe_id):
         if not cursor.fetchone():
             return jsonify({"status": "error", "message": "Recipe not found."}), 404
 
+        # Delete references in mapping tables first to avoid Foreign Key constraint errors
         cursor.execute('DELETE FROM Recipe_Ingredient WHERE recipeID = ?', (recipe_id,))
         cursor.execute('DELETE FROM Recipe_Tag WHERE recipeID = ?', (recipe_id,))
         cursor.execute('DELETE FROM MealPlan WHERE recipeID = ?', (recipe_id,))
+        # Now it's safe to delete the recipe itself
         cursor.execute('DELETE FROM Recipe WHERE recipeID = ?', (recipe_id,))
 
         conn.commit()
@@ -173,6 +185,7 @@ def delete_recipe(recipe_id):
 
 
 # ── Update a recipe ──
+# The corresponding js func is saveRecipe, updateExistingRecipe
 @recipe_bp.route('/recipe/update/<int:recipe_id>', methods=['PUT'])
 def update_recipe(recipe_id):
     uid = get_current_user()
@@ -198,15 +211,18 @@ def update_recipe(recipe_id):
         if not cursor.fetchone():
             return jsonify({"status": "error", "message": "Recipe not found."}), 404
 
+        # Update the main Recipe table
         cursor.execute('''
             UPDATE Recipe 
             SET title = ?, favorites = ?, cook_time = ?, instructions = ?, image = ?
             WHERE recipeID = ? AND userID = ?
         ''', (title, favorites, cook_time, instructions, image, recipe_id, uid))
 
+        # Clear old ingredient and tag mappings for this recipe
         cursor.execute('DELETE FROM Recipe_Ingredient WHERE recipeID = ?', (recipe_id,))
         cursor.execute('DELETE FROM Recipe_Tag WHERE recipeID = ?', (recipe_id,))
 
+        # Re-insert the updated ingredients
         for ing_amount, ing_name in ingredients:
             ing_name = ing_name.strip()
             if not ing_name:
@@ -225,6 +241,7 @@ def update_recipe(recipe_id):
                 VALUES (?, ?, ?)
             ''', (recipe_id, ing_id, ing_amount))
 
+        # Re-insert the updated ingredients
         for t in tags:
             t = t.strip()
             if not t:
