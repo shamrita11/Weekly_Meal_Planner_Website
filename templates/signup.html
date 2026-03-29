@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="page-home" class="page active">
+  <div class="hero-bg">
+    <img src="https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1600&q=80" alt="kitchen" class="hero-img"/>
+    <div class="hero-overlay"></div>
+  </div>
+  <nav class="nav nav-home">
+    <div class="logo"><span class="logo-icon">👨‍🍳</span><span>WEEKLY MEAL PLANNER</span></div>
+  </nav>
+  <div class="hero-content">
+    <h1 class="hero-title" style="font-size:3rem;">Sign Up</h1>
+
+    <div class="auth-form">
+      <input id="signup-name" class="auth-input" type="text" placeholder="Your Name" />
+      <input id="signup-id" class="auth-input" type="text" placeholder="Choose a User ID" />
+      <input id="signup-pw" class="auth-input" type="password" placeholder="Password" />
+      <input id="signup-pw2" class="auth-input" type="password" placeholder="Confirm Password" />
+      <p id="signup-error" class="auth-error"></p>
+      <button class="pill-btn large primary" onclick="submitSignup()">Create Account</button>
+      <p class="auth-link">Already have an account? <a href="/login">Log in</a></p>
+    </div>
+  </div>
+</div>
+
+<script>
+function submitSignup() {
+  const name = document.getElementById('signup-name').value.trim();
+  const loginId = document.getElementById('signup-id').value.trim();
+  const pw = document.getElementById('signup-pw').value;
+  const pw2 = document.getElementById('signup-pw2').value;
+  const errEl = document.getElementById('signup-error');
+  errEl.textContent = '';
+
+  if (!name || !loginId || !pw) {
+    errEl.textContent = 'All fields are required.';
+    return;
+  }
+  if (pw !== pw2) {
+    errEl.textContent = 'Passwords do not match.';
+    return;
+  }
+  if (pw.length < 4) {
+    errEl.textContent = 'Password must be at least 4 characters.';
+    return;
+  }
+
+  fetch('/auth/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: name, login_id: loginId, password: pw })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === 'success') {
+      window.location.href = '/dashboard';
+    } else {
+      errEl.textContent = data.message || 'Signup failed.';
+    }
+  })
+  .catch(() => { errEl.textContent = 'Could not connect to server.'; });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitSignup();
+});
+</script>
+{% endblock %}

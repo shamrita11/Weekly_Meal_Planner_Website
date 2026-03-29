@@ -11,8 +11,11 @@
   </nav>
   <div class="hero-content">
     <h1 class="hero-title">Welcome!</h1>
-    <p class="hero-sub">Click Below to View Your Meal Planner</p>
-    <button class="pill-btn large" onclick="navigate('main')">Meal Planner</button>
+    <p class="hero-sub">Plan your meals, organize your recipes</p>
+    <div style="display:flex; gap:12px; justify-content:center;">
+      <button class="pill-btn large" onclick="window.location.href='/login'">Log In</button>
+      <button class="pill-btn large primary" onclick="window.location.href='/signup'">Sign Up</button>
+    </div>
   </div>
 </div>
 {% endblock %}

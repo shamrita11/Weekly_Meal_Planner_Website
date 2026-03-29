@@ -614,7 +614,7 @@ function saveRecipe() {
     const ingName;
     return { amount: amount || '', name: ingName || '' };
   }).filter(item => item.name !== ''); 
-
+  
   const tags = tagsRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean); // No longer use split by ','
   const imageData = imagePreview.src && imagePreview.style.display !== 'none' ? imagePreview.src : '';
 
@@ -678,14 +678,21 @@ function syncStats() {
 }
 
 // ══════════════════ THEME TOGGLE ══════════════════
-let isDark = true;
+let isDark = localStorage.getItem('theme') !== 'light';
 
-function toggleTheme() {
-  isDark = !isDark;
+function applyTheme() {
   document.body.classList.toggle('light', !isDark);
   const label = isDark ? '🌙 Dark' : '☀️ Light';
   document.querySelectorAll('.theme-toggle').forEach(btn => btn.textContent = label);
 }
+
+function toggleTheme() {
+  isDark = !isDark;
+  localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  applyTheme();
+}
+// Apply the saved theme as soon as the script loads
+applyTheme();
 
 // ════════════════════════════ INIT  ════════════════════════════
 function loadRecipesFromDB(callback) {

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="page-home" class="page active">
+  <div class="hero-bg">
+    <img src="https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1600&q=80" alt="kitchen" class="hero-img"/>
+    <div class="hero-overlay"></div>
+  </div>
+  <nav class="nav nav-home">
+    <div class="logo"><span class="logo-icon">👨‍🍳</span><span>WEEKLY MEAL PLANNER</span></div>
+  </nav>
+  <div class="hero-content">
+    <h1 class="hero-title" style="font-size:3rem;">Log In</h1>
+
+    <div class="auth-form">
+      <input id="login-id" class="auth-input" type="text" placeholder="User ID" />
+      <input id="login-pw" class="auth-input" type="password" placeholder="Password" />
+      <p id="login-error" class="auth-error"></p>
+      <button class="pill-btn large primary" onclick="submitLogin()">Log In</button>
+      <p class="auth-link">Don't have an account? <a href="/signup">Sign up</a></p>
+    </div>
+  </div>
+</div>
+
+<script>
+function submitLogin() {
+  const loginId = document.getElementById('login-id').value.trim();
+  const password = document.getElementById('login-pw').value.trim();
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+
+  if (!loginId || !password) {
+    errEl.textContent = 'Please fill in both fields.';
+    return;
+  }
+
+  fetch('/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ login_id: loginId, password: password })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === 'success') {
+      window.location.href = '/dashboard';
+    } else {
+      errEl.textContent = data.message || 'Login failed.';
+    }
+  })
+  .catch(() => { errEl.textContent = 'Could not connect to server.'; });
+}
+
+// Allow Enter key to submit
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitLogin();
+});
+</script>
+{% endblock %}
