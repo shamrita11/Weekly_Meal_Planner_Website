@@ -56,6 +56,23 @@ def save_mealplan():
                     VALUES (?, ?, ?, ?, ?)
                 ''', (uid, week_date, day, meal_type, recipe_id))
 
+                # Add ingredients to Shopping List
+                cursor.execute('SELECT ingreID FROM Recipe_Ingredient WHERE recipeID = ?', (recipe_id,))
+                ingredients = cursor.fetchall()
+                
+                # Insert them into the ShoppingList table ONLY if they don't already exist
+                for ing in ingredients:
+                    cursor.execute('''
+                        SELECT 1 FROM ShoppingList 
+                        WHERE userID = ? AND recipeID = ? AND ingreID = ?
+                    ''', (uid, recipe_id, ing['ingreID']))
+                    
+                    if not cursor.fetchone():
+                        cursor.execute('''
+                            INSERT INTO ShoppingList (userID, recipeID, ingreID, input_item, checked) 
+                            VALUES (?, ?, ?, NULL, 'no')
+                        ''', (uid, recipe_id, ing['ingreID']))
+                        
         conn.commit()
         return jsonify({"status": "success"}), 200
 

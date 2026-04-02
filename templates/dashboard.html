@@ -51,7 +51,12 @@
     <!-- SHOPPING LIST -->
     <aside class="sidebar">
       <div class="card sidebar-card">
-        <div class="section-header sm-header">Shopping List</div>
+        <div class="section-header sm-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px;">
+          <span>Shopping List</span>
+          <button class="icon-btn" onclick="clearShoppingList()" title="Clear List" style="font-size: 1.1rem; padding: 0;">🗑️</button>
+        </div>
+
+        
         <ul id="shopping-list" class="shop-list"></ul>
         <input id="shop-input" class="shop-input" placeholder="Add item…" onkeydown="addShopItem(event)"/>
       </div>

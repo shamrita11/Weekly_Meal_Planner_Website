@@ -13,7 +13,7 @@ let mealPlans = {};
 let mainWeekOffset = 0;
 let mpWeekOffset = 0;
 
-let shoppingList = []; // each element is a dictinoary {id: 1, text: "Eggs", checked: false}
+let shoppingList = []; // each element is a dictinoary {id: 1, name: "Eggs", checked: false}
 
 let nextId = 3;
 let currentModalRecipeId = null;
@@ -170,7 +170,7 @@ function renderShoppingList() {
     const label = document.createElement('label');
     label.htmlFor = 'shop-cb-' + item.id;
     label.className = 'shop-label';
-    label.textContent = item.text;
+    label.textContent = item.name;
     
     li.appendChild(cb);
     li.appendChild(circle);
@@ -207,7 +207,7 @@ function addShopItem(e) {
       .then(data => {
         if (data.status === 'success') {
           // Add to local array using the real database itemID
-          shoppingList.push({ id: data.id, text: val, checked: false });
+          shoppingList.push({ id: data.id, name: val, checked: false });
           input.value = '';
           renderShoppingList();
         } else {
@@ -225,6 +225,29 @@ function toggleShopItemDB(itemId, isChecked) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ checked: isChecked })
   }).catch(err => console.error('Error toggling item:', err));
+}
+
+function clearShoppingList() {
+  if (shoppingList.length === 0) return; // Do nothing if list is already empty
+  
+  if (!confirm('Are you sure you want to clear your entire shopping list?')) {
+    return;
+  }
+
+  fetch('/shop/clear', {
+    method: 'DELETE'
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === 'success') {
+      // Empty the local array and re-render the UI
+      shoppingList = [];
+      renderShoppingList();
+    } else {
+      alert('Failed to clear list: ' + data.message);
+    }
+  })
+  .catch(err => console.error('Error clearing shopping list:', err));
 }
 
 function loadShoppingListFromDB(callback) {
@@ -376,13 +399,8 @@ function assignRecipeToCell(recipeId) {
   .then(response => response.json())
   .then(data => {
     if (data.status === 'success') {
-      // Only update the UI if the database successfully saved the change
-      const plan = getMealPlan(pendingCell.weekOffset || 0);
-      plan[pendingCell.dayIdx][pendingCell.mealIdx] = recipeId;
-      
-      document.getElementById('cell-picker').classList.remove('open');
-      renderPlanGrid(pendingCell.gridId, pendingCell.weekOffset || 0);
-      pendingCell = null;
+      // Reload the page to automatically fetch the new grid and new shopping list
+      window.location.reload();
     } else {
       alert('Database Error: ' + data.message);
     }
