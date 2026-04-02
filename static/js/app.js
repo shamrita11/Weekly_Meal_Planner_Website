@@ -13,7 +13,9 @@ let mealPlans = {};
 let mainWeekOffset = 0;
 let mpWeekOffset = 0;
 
-let shoppingList = []; // each element is a dictinoary {id: 1, name: "Eggs", checked: false}
+let recipeShoppingList = []; // each element looks like {title, count, ingredients: [{itemID, ingredient, checked}, ...]}
+let customShoppingList = []; // each element looks like {id: 1, name: "Eggs", checked: false}
+let shoppingList = [];
 
 let nextId = 3;
 let currentModalRecipeId = null;
@@ -154,42 +156,82 @@ function scrollRecipeStrip(dir) {
 function renderShoppingList() {
   const ul = document.getElementById('shopping-list');
   ul.innerHTML = '';
-  shoppingList.forEach((item) => {
-    const li = document.createElement('li');
-    li.className = 'shop-item';
+  
+  const recipeTemplate = document.getElementById('recipe-box-template');
+  const itemTemplate = document.getElementById('shop-item-template');
+
+  // Render Grouped Recipe Items
+  recipeShoppingList.forEach(recipe => {
+    const boxClone = recipeTemplate.content.cloneNode(true);
     
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.id = 'shop-cb-' + item.id;
-    cb.className = 'shop-cb';
-    cb.checked = item.checked;
-    
-    const circle = document.createElement('span');
-    circle.className = 'shop-circle';
-    
-    const label = document.createElement('label');
-    label.htmlFor = 'shop-cb-' + item.id;
-    label.className = 'shop-label';
-    label.textContent = item.name;
-    
-    li.appendChild(cb);
-    li.appendChild(circle);
-    li.appendChild(label);
-    
-    // Clicking the circle manually toggles the checkbox and syncs to DB
-    circle.addEventListener('click', () => { 
-      const newChecked = !cb.checked;
-      cb.checked = newChecked; 
-      
-      // Update local array
-      item.checked = newChecked;
-      
-      // Sync with database
-      toggleShopItemDB(item.id, newChecked);
+    boxClone.querySelector('.recipe-title-text').textContent = recipe.title;
+    if (recipe.count >= 2) {
+      boxClone.querySelector('.recipe-multiplier').textContent = `x ${recipe.count}`;
+    }
+
+    const ingContainer = boxClone.querySelector('.ingredient-container');
+
+    // Fill in the ingredients
+    recipe.ingredients.forEach(item => {
+      const itemClone = createItemFromTemplate(itemTemplate, item);
+      ingContainer.appendChild(itemClone);
     });
-    
-    ul.appendChild(li);
+
+    ul.appendChild(boxClone);
   });
+
+  // Render Custom Input Items
+  customShoppingList.forEach((item) => {
+    const itemClone = createItemFromTemplate(itemTemplate, item);
+    ul.appendChild(itemClone);
+  });
+}
+
+
+function createItemFromTemplate(template, itemData) {
+  const clone = template.content.cloneNode(true);
+  
+  const cb = clone.querySelector('.shop-cb');
+  cb.id = 'shop-cb-' + itemData.id;
+  cb.checked = itemData.checked;
+
+  const label = clone.querySelector('.shop-label');
+  label.htmlFor = 'shop-cb-' + itemData.id;
+  label.textContent = itemData.name;
+
+  const circle = clone.querySelector('.shop-circle');
+  circle.addEventListener('click', () => {
+    const newChecked = !cb.checked;
+    cb.checked = newChecked;
+    itemData.checked = newChecked;
+    toggleShopItemDB(itemData.id, newChecked);
+  });
+
+  return clone;
+}
+
+function toggleShopItemDB(itemId, isChecked) {
+  fetch(`/shop/toggle/${itemId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ checked: isChecked })
+  }).catch(err => console.error('Error toggling item:', err));
+}
+
+function loadShoppingListFromDB(callback) {
+  fetch('/shop/get')
+    .then(response => response.json())
+    .then(data => {
+      if (data.status === 'success') {
+        // Correctly assign the two new data arrays from the Python route
+        recipeShoppingList = data.recipe_items || [];
+        customShoppingList = data.custom_items || [];
+        if (callback) callback();
+      } else {
+        console.error('Failed to load shopping list:', data.message);
+      }
+    })
+    .catch(err => console.error('Error fetching shopping list:', err));
 }
 
 function addShopItem(e) {
@@ -206,8 +248,8 @@ function addShopItem(e) {
       .then(response => response.json())
       .then(data => {
         if (data.status === 'success') {
-          // Add to local array using the real database itemID
-          shoppingList.push({ id: data.id, name: val, checked: false });
+          // Push strictly to the custom list using the new DB itemID
+          customShoppingList.push({ id: data.id, name: val, checked: false });
           input.value = '';
           renderShoppingList();
         } else {
@@ -219,16 +261,9 @@ function addShopItem(e) {
   }
 }
 
-function toggleShopItemDB(itemId, isChecked) {
-  fetch(`/shop/toggle/${itemId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ checked: isChecked })
-  }).catch(err => console.error('Error toggling item:', err));
-}
-
 function clearShoppingList() {
-  if (shoppingList.length === 0) return; // Do nothing if list is already empty
+  // Check both new arrays to see if the list is already empty
+  if (recipeShoppingList.length === 0 && customShoppingList.length === 0) return; 
   
   if (!confirm('Are you sure you want to clear your entire shopping list?')) {
     return;
@@ -240,26 +275,15 @@ function clearShoppingList() {
   .then(response => response.json())
   .then(data => {
     if (data.status === 'success') {
-      // Empty the local array and re-render the UI
-      shoppingList = [];
+      // Empty both local arrays and re-render the UI
+      recipeShoppingList = [];
+      customShoppingList = [];
       renderShoppingList();
     } else {
       alert('Failed to clear list: ' + data.message);
     }
   })
   .catch(err => console.error('Error clearing shopping list:', err));
-}
-
-function loadShoppingListFromDB(callback) {
-  fetch('/shop/get')
-    .then(response => response.json())
-    .then(data => {
-      if (data.status === 'success') {
-        shoppingList = data.items;
-        if (callback) callback();
-      }
-    })
-    .catch(err => console.error('Error fetching shopping list:', err));
 }
 
 // ══════════════════ PLAN GRID ══════════════════
@@ -930,13 +954,11 @@ function saveRecipe() {
 }
 
 
-// I'll revisit it later especially for meal plan part
 function deleteRecipe() {
   const editingId = parseInt(document.getElementById('f-editing-id').value);
   if (!editingId) return;
   if (!confirm('Remove this recipe?')) return;
 
-  // Send a DELETE request to the Flask backend
   fetch(`/recipe/delete/${editingId}`, {
     method: 'DELETE'
   })

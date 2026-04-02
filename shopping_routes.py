@@ -26,28 +26,65 @@ def get_shop_items():
         cursor.execute("DELETE FROM ShoppingList WHERE userID = ? AND checked = 'yes'", (uid,))
         
         cursor.execute('''
-            SELECT sl.itemID, sl.checked, sl.input_item, i.ingredient 
+            SELECT 
+                MIN(sl.itemID) as itemID, 
+                sl.recipeID, 
+                i.ingredient,
+                r.title as recipe_title,
+                COUNT(sl.itemID) as multiplier
             FROM ShoppingList sl
-            LEFT JOIN Ingredient i ON sl.ingreID = i.ingreID
-            WHERE sl.userID = ?
+            JOIN Ingredient i ON sl.ingreID = i.ingreID
+            JOIN Recipe r ON sl.recipeID = r.recipeID
+            WHERE sl.userID = ? AND sl.input_item IS NULL
+            GROUP BY sl.recipeID, sl.ingreID, i.ingredient, r.title
         ''', (uid,))
-        rows = cursor.fetchall()
-        
-        items = [] # we want a list of dictinoary
-        for r in rows:
-            if r['input_item']:
-                ingre_name = r['input_item']
-            else:
-                ingre_name = r['ingredient']
 
-            items.append({
+        recipe_rows = cursor.fetchall()
+        
+        recipes_dict = {} # {recipe_id: {title, count, ingredients: [{itemID, ingredient, checked}, ...]}, ...}
+                          # keep track of recipe to group the same one
+        for r in recipe_rows:
+            rec_id = r['recipeID']
+            if rec_id not in recipes_dict:
+                recipes_dict[rec_id] = {
+                    "title": r['recipe_title'],
+                    "count": r['multiplier'], 
+                    "ingredients": []
+                }
+
+            if r['multiplier'] > recipes_dict[rec_id]['count']:
+                recipes_dict[rec_id]['count'] = r['multiplier']
+            
+            # SQL's group by has removed the duplicate ingredients
+            recipes_dict[rec_id]['ingredients'].append({
                 "id": r['itemID'],
-                "name": ingre_name,
+                "name": r['ingredient'],
                 "checked": False
             })
-            
+
+        recipe_items = list(recipes_dict.values()) # [{title, count, ingredients: [{itemID, ingredient, checked}, ...]},..]
+
+        # For custom manual input items
+        cursor.execute('''
+            SELECT itemID, input_item
+            FROM ShoppingList
+            WHERE userID = ? AND input_item IS NOT NULL
+        ''', (uid,))
+        custom_rows = cursor.fetchall()
+        
+        custom_items = []
+        for cr in custom_rows:
+            custom_items.append({
+                "id": cr['itemID'],
+                "name": cr['input_item'],
+                "checked": False
+            })
+
         conn.commit()
-        return jsonify({"status": "success", "items": items}), 200
+        return jsonify({"status": "success", 
+            "recipe_items": recipe_items, 
+            "custom_items": custom_items
+        }), 200
 
     except Exception as e:
         conn.rollback()
@@ -100,12 +137,31 @@ def toggle_shop_item(item_id):
     cursor = conn.cursor()
 
     try:
+        # check if this item belongs to a recipe or is a custom item
         cursor.execute('''
-            UPDATE ShoppingList SET checked = ? 
+            SELECT recipeID, ingreID 
+            FROM ShoppingList 
             WHERE itemID = ? AND userID = ?
-        ''', (is_checked, item_id, uid))
+        ''', (item_id, uid))
+        row = cursor.fetchone()
+
+        if not row:
+            return jsonify({"status": "error", "message": "Item not found."}), 404
+
+        if row['recipeID'] is not None and row['ingreID'] is not None:
+            # It's a recipe ingredient, toggle all tuples that have (recipeId, ingreID)
+            cursor.execute('''
+                UPDATE ShoppingList SET checked = ? 
+                WHERE userID = ? AND recipeID = ? AND ingreID = ? AND input_item IS NULL
+            ''', (is_checked, uid, row['recipeID'], row['ingreID']))
+        else:
+            # It's a custom input item
+            cursor.execute('''
+                UPDATE ShoppingList SET checked = ? 
+                WHERE itemID = ? AND userID = ?
+            ''', (is_checked, item_id, uid))
+            
         conn.commit()
-        
         return jsonify({"status": "success"}), 200
     except Exception as e:
         conn.rollback()
