@@ -32,47 +32,59 @@ def save_mealplan():
     cursor = conn.cursor()
 
     try:
-        # Check if this cell already exists for this user
+        # Check what is currently sitting in this cell
         cursor.execute('''
-            SELECT mID FROM MealPlan 
+            SELECT mID, recipeID FROM MealPlan 
             WHERE userID = ? AND week_date = ? AND day = ? AND meal_type = ?
         ''', (uid, week_date, day, meal_type))
         row = cursor.fetchone()
+        
+        old_recipe_id = row['recipeID'] if row else None
+        # If they assign the exact same recipe back and forth, do nothing to ensure
+        # the consistency of the shopping list
+        if old_recipe_id == recipe_id:
+            return jsonify({"status": "success"}), 200
 
+        # -- Remove old recipe's ingre from shopping list--
+        if old_recipe_id:
+            cursor.execute('SELECT ingreID FROM Recipe_Ingredient WHERE recipeID = ?', (old_recipe_id,))
+            old_ings = cursor.fetchall()
+            
+            for ing in old_ings:
+                cursor.execute('''
+                    DELETE FROM ShoppingList 
+                    WHERE itemID = (
+                        SELECT itemID FROM ShoppingList 
+                        WHERE userID = ? AND recipeID = ? AND ingreID = ?
+                        LIMIT 1
+                    )
+                ''', (uid, old_recipe_id, ing['ingreID']))
+        
+        # -- Update the MealPlan grid --
         if recipe_id is None:
-            # If the frontend sent null, the user clicked "Clear". Delete the row if it exists.
+            # User clicked clear
             if row:
                 cursor.execute('DELETE FROM MealPlan WHERE mID = ?', (row['mID'],))
         else:
-            # If a recipe was selected, either update the existing cell or insert a new one
+            # User assigned a new recipe
             if row:
-                cursor.execute(
-                    'UPDATE MealPlan SET recipeID = ? WHERE mID = ?',
-                    (recipe_id, row['mID'])
-                )
+                cursor.execute('UPDATE MealPlan SET recipeID = ? WHERE mID = ?', (recipe_id, row['mID']))
             else:
                 cursor.execute('''
                     INSERT INTO MealPlan (userID, week_date, day, meal_type, recipeID) 
                     VALUES (?, ?, ?, ?, ?)
                 ''', (uid, week_date, day, meal_type, recipe_id))
 
-                # Add ingredients to Shopping List
-                cursor.execute('SELECT ingreID FROM Recipe_Ingredient WHERE recipeID = ?', (recipe_id,))
-                ingredients = cursor.fetchall()
-                
-                # Insert them into the ShoppingList table ONLY if they don't already exist
-                for ing in ingredients:
-                    cursor.execute('''
-                        SELECT 1 FROM ShoppingList 
-                        WHERE userID = ? AND recipeID = ? AND ingreID = ?
-                    ''', (uid, recipe_id, ing['ingreID']))
-                    
-                    if not cursor.fetchone():
-                        cursor.execute('''
-                            INSERT INTO ShoppingList (userID, recipeID, ingreID, input_item, checked) 
-                            VALUES (?, ?, ?, NULL, 'no')
-                        ''', (uid, recipe_id, ing['ingreID']))
-                        
+        # -- Add new ingredients to shopping list --
+        cursor.execute('SELECT ingreID FROM Recipe_Ingredient WHERE recipeID = ?', (recipe_id,))
+        new_ings = cursor.fetchall()
+        
+        for ing in new_ings:
+            cursor.execute('''
+                INSERT INTO ShoppingList (userID, recipeID, ingreID, input_item, checked) 
+                VALUES (?, ?, ?, NULL, 'no')
+            ''', (uid, recipe_id, ing['ingreID']))
+
         conn.commit()
         return jsonify({"status": "success"}), 200
 
