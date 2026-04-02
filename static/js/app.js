@@ -13,7 +13,7 @@ let mealPlans = {};
 let mainWeekOffset = 0;
 let mpWeekOffset = 0;
 
-let shoppingList = ["Eggs", "Bread", "Blueberries", "Lettuce"];
+let shoppingList = []; // each element is a dictinoary {id: 1, text: "Eggs", checked: false}
 
 let nextId = 3;
 let currentModalRecipeId = null;
@@ -150,27 +150,44 @@ function scrollRecipeStrip(dir) {
   container.style.transform = `translateX(-${stripScroll * thumbWidth}px)`;
 }
 
+// ══════════════════ SHOPPING LIST ══════════════════
 function renderShoppingList() {
   const ul = document.getElementById('shopping-list');
   ul.innerHTML = '';
-  shoppingList.forEach((item, idx) => {
+  shoppingList.forEach((item) => {
     const li = document.createElement('li');
     li.className = 'shop-item';
+    
     const cb = document.createElement('input');
     cb.type = 'checkbox';
-    cb.id = 'shop-cb-' + idx;
+    cb.id = 'shop-cb-' + item.id;
     cb.className = 'shop-cb';
+    cb.checked = item.checked;
+    
     const circle = document.createElement('span');
     circle.className = 'shop-circle';
+    
     const label = document.createElement('label');
-    label.htmlFor = 'shop-cb-' + idx;
+    label.htmlFor = 'shop-cb-' + item.id;
     label.className = 'shop-label';
-    label.textContent = item;
+    label.textContent = item.text;
+    
     li.appendChild(cb);
     li.appendChild(circle);
     li.appendChild(label);
-    // clicking the circle manually toggles the checkbox
-    circle.addEventListener('click', () => { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); circle.classList.toggle('checked', cb.checked); label.classList.toggle('checked', cb.checked); });
+    
+    // Clicking the circle manually toggles the checkbox and syncs to DB
+    circle.addEventListener('click', () => { 
+      const newChecked = !cb.checked;
+      cb.checked = newChecked; 
+      
+      // Update local array
+      item.checked = newChecked;
+      
+      // Sync with database
+      toggleShopItemDB(item.id, newChecked);
+    });
+    
     ul.appendChild(li);
   });
 }
@@ -180,11 +197,46 @@ function addShopItem(e) {
     const input = document.getElementById('shop-input');
     const val = input.value.trim();
     if (val) {
-      shoppingList.push(val);
-      input.value = '';
-      renderShoppingList();
+      // Save to database first
+      fetch('/shop/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input_item: val })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === 'success') {
+          // Add to local array using the real database itemID
+          shoppingList.push({ id: data.id, text: val, checked: false });
+          input.value = '';
+          renderShoppingList();
+        } else {
+          alert('Failed to add item: ' + data.message);
+        }
+      })
+      .catch(err => console.error('Error adding item:', err));
     }
   }
+}
+
+function toggleShopItemDB(itemId, isChecked) {
+  fetch(`/shop/toggle/${itemId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ checked: isChecked })
+  }).catch(err => console.error('Error toggling item:', err));
+}
+
+function loadShoppingListFromDB(callback) {
+  fetch('/shop/get')
+    .then(response => response.json())
+    .then(data => {
+      if (data.status === 'success') {
+        shoppingList = data.items;
+        if (callback) callback();
+      }
+    })
+    .catch(err => console.error('Error fetching shopping list:', err));
 }
 
 // ══════════════════ PLAN GRID ══════════════════
@@ -1022,10 +1074,14 @@ document.addEventListener('DOMContentLoaded', function() {
   loadRecipesFromDB(() => {
     // 2. Then fetch Meal Plans
     loadMealPlansFromDB(() => {
-      // 3. Finally, render the UI with all the data ready
-      initializePageUI();
+      // 3. Then fetch Shopping List
+      loadShoppingListFromDB(() => {
+        // 4. Finally, render the UI with all the data ready
+        initializePageUI();
+      });
     });
   });
+
 });
 
 // ══════════════════ RESIZE HANDLE ══════════════════
