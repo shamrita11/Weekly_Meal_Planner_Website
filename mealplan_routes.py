@@ -15,6 +15,7 @@ def get_current_user():
 
 
 # ── Save / Update / Clear a single meal plan cell ──
+# The corresponding js function that sends the request is assignRecipeToCell
 @mealplan_bp.route('/mealplan/sync', methods=['POST'])
 def save_mealplan():
     uid = get_current_user()
@@ -25,7 +26,7 @@ def save_mealplan():
     week_date = data.get('week_date')
     day = data.get('day')
     meal_type = data.get('meal_type')
-    recipe_id = data.get('recipe_id')
+    recipe_id = data.get('recipe_id') # This will be None if the user is clearing the cell
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -39,9 +40,11 @@ def save_mealplan():
         row = cursor.fetchone()
 
         if recipe_id is None:
+            # If the frontend sent null, the user clicked "Clear". Delete the row if it exists.
             if row:
                 cursor.execute('DELETE FROM MealPlan WHERE mID = ?', (row['mID'],))
         else:
+            # If a recipe was selected, either update the existing cell or insert a new one
             if row:
                 cursor.execute(
                     'UPDATE MealPlan SET recipeID = ? WHERE mID = ?',
@@ -64,6 +67,7 @@ def save_mealplan():
 
 
 # ── Load all meal plan entries for the current user ──
+# The corresponding js func is loadRecipesFromDB
 @mealplan_bp.route('/mealplan/get', methods=['GET'])
 def get_mealplans():
     uid = get_current_user()

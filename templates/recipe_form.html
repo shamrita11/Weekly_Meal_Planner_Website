@@ -14,25 +14,51 @@
     <h2 id="form-title" class="form-heading">New Recipe</h2>
     <div class="card form-card">
       <div class="form-row"><label class="form-label pill-label">Recipe Name*</label><input id="f-name" class="form-input" placeholder="e.g. Fried Rice"/></div>
-      <div class="form-row"><label class="form-label pill-label">Ingredients*</label><textarea id="f-ingredients" class="form-textarea" placeholder="1 cup rice&#10;1 onion&#10;…"></textarea></div>
+
+      <div class="form-row form-row-tall">
+        <label class="form-label pill-label">Ingredients*</label>
+        <div class="ingredients-field">
+          <!--<p class="field-hint">Amount and name per row. Use <strong>+</strong> to add another ingredient.</p> -->
+          <div class="ingredients-list-wrap">
+            <div id="ingredients-rows" class="ingredients-rows"></div>
+            <!--
+            <div class="ingredients-add-row">
+              <button type="button" class="ing-add-row-btn" id="ing-add-row" onclick="addIngredientRow()" aria-label="Add ingredient row">+</button>
+            </div>
+            -->
+          </div>
+        </div>
+      </div>
+
       <div class="form-row"><label class="form-label pill-label">Estimated Time To Make</label><input id="f-time" class="form-input" placeholder="e.g. 30 minutes"/></div>
-      <div class="form-row"><label class="form-label pill-label">Tags*<br/><small>(keywords for search)</small></label><input id="f-tags" class="form-input" placeholder="e.g. dinner, asian, rice"/></div>
+
+      <div class="form-row form-row-tall">
+        <label class="form-label pill-label">Tags*<br/><small>(keywords for search)</small></label>
+        <div class="tags-field">
+          <div class="tags-input-row">
+            <input id="tag-input" class="form-input tag-input" placeholder="e.g. dinner, italian, vegan" autocomplete="off"/>
+            <button type="button" class="tag-add-btn" id="tag-add-btn" onclick="addTagFromInput()" aria-label="Add tag">+</button>
+          </div>
+          <div id="tag-chips" class="tag-chips" aria-live="polite"></div>
+        </div>
+      </div>
+
       <div class="form-row"><label class="form-label pill-label">Instructions*</label><textarea id="f-instructions" class="form-textarea" placeholder="1. Boil water…&#10;2. …"></textarea></div>
       <div class="form-row"><label class="form-label pill-label">Image*</label>
         <div class="upload-wrap">
           <input type="file" id="f-image-file" accept="image/*" style="display:none" onchange="previewImage(event)"/>
-          <button class="upload-btn" onclick="document.getElementById('f-image-file').click()">⬆ Upload</button>
+          <button type="button" class="upload-btn" onclick="document.getElementById('f-image-file').click()">⬆ Upload</button>
           <span id="f-image-name" class="upload-name">No file chosen</span>
-          <img id="f-image-preview" src="" style="display:none;max-height:80px;border-radius:8px;margin-left:10px"/>
+          <img id="f-image-preview" src="" alt="" style="display:none;max-height:80px;border-radius:8px;margin-left:10px"/>
         </div>
       </div>
     </div>
     <div class="form-footer">
-      <label class="fav-label"><input type="checkbox" id="f-fav"/> ⭐ Save to Favourites</label>
+      <button type="button" id="f-fav-btn" class="pill-btn sm fav-form-btn" onclick="toggleRecipeFormFavourite()" aria-pressed="false">⭐ Save to Favourites</button>
       <div class="form-footer-right">
         <button id="f-delete-btn" class="pill-btn sm danger" style="display:none" onclick="deleteRecipe()">🗑 Delete Recipe</button>
-        <button class="pill-btn sm" onclick="navigate('recipes')">Cancel</button>
-        <button class="pill-btn sm primary" onclick="saveRecipe()">Submit</button>
+        <button type="button" class="pill-btn sm" onclick="navigate('recipes')">Cancel</button>
+        <button type="button" class="pill-btn sm primary" onclick="saveRecipe()">Submit</button>
       </div>
     </div>
     <input type="hidden" id="f-editing-id" value=""/>
