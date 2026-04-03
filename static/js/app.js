@@ -13,7 +13,9 @@ let mealPlans = {};
 let mainWeekOffset = 0;
 let mpWeekOffset = 0;
 
-let shoppingList = ["Eggs", "Bread", "Blueberries", "Lettuce"];
+let recipeShoppingList = []; // each element looks like {title, count, ingredients: [{itemID, ingredient, checked}, ...]}
+let customShoppingList = []; // each element looks like {id: 1, name: "Eggs", checked: false}
+let shoppingList = [];
 
 let nextId = 3;
 let currentModalRecipeId = null;
@@ -150,29 +152,86 @@ function scrollRecipeStrip(dir) {
   container.style.transform = `translateX(-${stripScroll * thumbWidth}px)`;
 }
 
+// ══════════════════ SHOPPING LIST ══════════════════
 function renderShoppingList() {
   const ul = document.getElementById('shopping-list');
   ul.innerHTML = '';
-  shoppingList.forEach((item, idx) => {
-    const li = document.createElement('li');
-    li.className = 'shop-item';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.id = 'shop-cb-' + idx;
-    cb.className = 'shop-cb';
-    const circle = document.createElement('span');
-    circle.className = 'shop-circle';
-    const label = document.createElement('label');
-    label.htmlFor = 'shop-cb-' + idx;
-    label.className = 'shop-label';
-    label.textContent = item;
-    li.appendChild(cb);
-    li.appendChild(circle);
-    li.appendChild(label);
-    // clicking the circle manually toggles the checkbox
-    circle.addEventListener('click', () => { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); circle.classList.toggle('checked', cb.checked); label.classList.toggle('checked', cb.checked); });
-    ul.appendChild(li);
+  
+  const recipeTemplate = document.getElementById('recipe-box-template');
+  const itemTemplate = document.getElementById('shop-item-template');
+
+  // Render Grouped Recipe Items
+  recipeShoppingList.forEach(recipe => {
+    const boxClone = recipeTemplate.content.cloneNode(true);
+    
+    boxClone.querySelector('.recipe-title-text').textContent = recipe.title;
+    if (recipe.count >= 2) {
+      boxClone.querySelector('.recipe-multiplier').textContent = `x ${recipe.count}`;
+    }
+
+    const ingContainer = boxClone.querySelector('.ingredient-container');
+
+    // Fill in the ingredients
+    recipe.ingredients.forEach(item => {
+      const itemClone = createItemFromTemplate(itemTemplate, item);
+      ingContainer.appendChild(itemClone);
+    });
+
+    ul.appendChild(boxClone);
   });
+
+  // Render Custom Input Items
+  customShoppingList.forEach((item) => {
+    const itemClone = createItemFromTemplate(itemTemplate, item);
+    ul.appendChild(itemClone);
+  });
+}
+
+
+function createItemFromTemplate(template, itemData) {
+  const clone = template.content.cloneNode(true);
+  
+  const cb = clone.querySelector('.shop-cb');
+  cb.id = 'shop-cb-' + itemData.id;
+  cb.checked = itemData.checked;
+
+  const label = clone.querySelector('.shop-label');
+  label.htmlFor = 'shop-cb-' + itemData.id;
+  label.textContent = itemData.name;
+
+  const circle = clone.querySelector('.shop-circle');
+  circle.addEventListener('click', () => {
+    const newChecked = !cb.checked;
+    cb.checked = newChecked;
+    itemData.checked = newChecked;
+    toggleShopItemDB(itemData.id, newChecked);
+  });
+
+  return clone;
+}
+
+function toggleShopItemDB(itemId, isChecked) {
+  fetch(`/shop/toggle/${itemId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ checked: isChecked })
+  }).catch(err => console.error('Error toggling item:', err));
+}
+
+function loadShoppingListFromDB(callback) {
+  fetch('/shop/get')
+    .then(response => response.json())
+    .then(data => {
+      if (data.status === 'success') {
+        // Correctly assign the two new data arrays from the Python route
+        recipeShoppingList = data.recipe_items || [];
+        customShoppingList = data.custom_items || [];
+        if (callback) callback();
+      } else {
+        console.error('Failed to load shopping list:', data.message);
+      }
+    })
+    .catch(err => console.error('Error fetching shopping list:', err));
 }
 
 function addShopItem(e) {
@@ -180,11 +239,51 @@ function addShopItem(e) {
     const input = document.getElementById('shop-input');
     const val = input.value.trim();
     if (val) {
-      shoppingList.push(val);
-      input.value = '';
-      renderShoppingList();
+      // Save to database first
+      fetch('/shop/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input_item: val })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === 'success') {
+          // Push strictly to the custom list using the new DB itemID
+          customShoppingList.push({ id: data.id, name: val, checked: false });
+          input.value = '';
+          renderShoppingList();
+        } else {
+          alert('Failed to add item: ' + data.message);
+        }
+      })
+      .catch(err => console.error('Error adding item:', err));
     }
   }
+}
+
+function clearShoppingList() {
+  // Check both new arrays to see if the list is already empty
+  if (recipeShoppingList.length === 0 && customShoppingList.length === 0) return; 
+  
+  if (!confirm('Are you sure you want to clear your entire shopping list?')) {
+    return;
+  }
+
+  fetch('/shop/clear', {
+    method: 'DELETE'
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === 'success') {
+      // Empty both local arrays and re-render the UI
+      recipeShoppingList = [];
+      customShoppingList = [];
+      renderShoppingList();
+    } else {
+      alert('Failed to clear list: ' + data.message);
+    }
+  })
+  .catch(err => console.error('Error clearing shopping list:', err));
 }
 
 // ══════════════════ PLAN GRID ══════════════════
@@ -324,13 +423,8 @@ function assignRecipeToCell(recipeId) {
   .then(response => response.json())
   .then(data => {
     if (data.status === 'success') {
-      // Only update the UI if the database successfully saved the change
-      const plan = getMealPlan(pendingCell.weekOffset || 0);
-      plan[pendingCell.dayIdx][pendingCell.mealIdx] = recipeId;
-      
-      document.getElementById('cell-picker').classList.remove('open');
-      renderPlanGrid(pendingCell.gridId, pendingCell.weekOffset || 0);
-      pendingCell = null;
+      // Reload the page to automatically fetch the new grid and new shopping list
+      window.location.reload();
     } else {
       alert('Database Error: ' + data.message);
     }
@@ -860,13 +954,11 @@ function saveRecipe() {
 }
 
 
-// I'll revisit it later especially for meal plan part
 function deleteRecipe() {
   const editingId = parseInt(document.getElementById('f-editing-id').value);
   if (!editingId) return;
   if (!confirm('Remove this recipe?')) return;
 
-  // Send a DELETE request to the Flask backend
   fetch(`/recipe/delete/${editingId}`, {
     method: 'DELETE'
   })
@@ -1022,10 +1114,14 @@ document.addEventListener('DOMContentLoaded', function() {
   loadRecipesFromDB(() => {
     // 2. Then fetch Meal Plans
     loadMealPlansFromDB(() => {
-      // 3. Finally, render the UI with all the data ready
-      initializePageUI();
+      // 3. Then fetch Shopping List
+      loadShoppingListFromDB(() => {
+        // 4. Finally, render the UI with all the data ready
+        initializePageUI();
+      });
     });
   });
+
 });
 
 // ══════════════════ RESIZE HANDLE ══════════════════

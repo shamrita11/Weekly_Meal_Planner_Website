@@ -4,6 +4,7 @@ from flask import Flask, render_template, session, redirect, url_for
 
 from recipe_routes import recipe_bp
 from mealplan_routes import mealplan_bp
+from shopping_routes import shop_bp
 from user_routes import user_bp, bcrypt
 
 app = Flask(__name__)
@@ -17,6 +18,7 @@ bcrypt.init_app(app)
 # Register blueprints
 app.register_blueprint(recipe_bp)
 app.register_blueprint(mealplan_bp)
+app.register_blueprint(shop_bp)
 app.register_blueprint(user_bp)
 
 # Decorator function that redirects to login if no user is in the session

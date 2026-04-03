@@ -51,11 +51,34 @@
     <!-- SHOPPING LIST -->
     <aside class="sidebar">
       <div class="card sidebar-card">
-        <div class="section-header sm-header">Shopping List</div>
+        <div class="section-header sm-header">
+          <span>Shopping List</span>
+          <button class="icon-btn" onclick="clearShoppingList()" title="Clear List">🗑️</button>
+        </div>
+        
         <ul id="shopping-list" class="shop-list"></ul>
         <input id="shop-input" class="shop-input" placeholder="Add item…" onkeydown="addShopItem(event)"/>
       </div>
     </aside>
   </div>
 </div>
+
+<template id="recipe-box-template">
+  <li class="recipe-box">
+    <div class="recipe-header">
+      <span class="recipe-title-text"></span>
+      <span class="recipe-multiplier"></span>
+    </div>
+    <div class="ingredient-container"></div>
+  </li>
+</template>
+
+<template id="shop-item-template">
+  <li class="shop-item">
+    <input type="checkbox" class="shop-cb">
+    <span class="shop-circle"></span>
+    <label class="shop-label"></label>
+  </li>
+</template>
+
 {% endblock %}
