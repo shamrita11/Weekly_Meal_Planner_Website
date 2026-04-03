@@ -1,0 +1,71 @@
+CREATE TABLE User (
+    userID INTEGER PRIMARY KEY AUTOINCREMENT,
+    username VARCHAR(100) NOT NULL,
+    login_id VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE Recipe (
+    recipeID INTEGER PRIMARY KEY AUTOINCREMENT,
+    userID INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    favorites VARCHAR(10) DEFAULT 'no',
+    cook_time VARCHAR(50),
+    instructions TEXT,
+    image VARCHAR(255),
+    FOREIGN KEY (userID) REFERENCES User(userID)
+);
+
+CREATE TABLE Ingredient (
+    ingreID INTEGER PRIMARY KEY AUTOINCREMENT,
+    ingredient VARCHAR(255) UNIQUE NOT NULL
+);
+
+CREATE TABLE Recipe_Ingredient (
+    recipeID INT,
+    ingreID INT,
+    amount VARCHAR(50),
+    PRIMARY KEY (recipeID, ingreID),
+    FOREIGN KEY (recipeID) REFERENCES Recipe(recipeID),
+    FOREIGN KEY (ingreID) REFERENCES Ingredient(ingreID)
+);
+
+CREATE TABLE Tag (
+    tagID INTEGER PRIMARY KEY AUTOINCREMENT,
+    tag VARCHAR(100) UNIQUE NOT NULL
+);
+
+CREATE TABLE Recipe_Tag (
+    recipeID INT,
+    tagID INT,
+    PRIMARY KEY (recipeID, tagID),
+    FOREIGN KEY (recipeID) REFERENCES Recipe(recipeID),
+    FOREIGN KEY (tagID) REFERENCES Tag(tagID)
+);
+
+CREATE TABLE MealPlan (
+    mID INTEGER PRIMARY KEY AUTOINCREMENT,
+    userID INT NOT NULL,
+    week_date DATE NOT NULL,
+    day VARCHAR(20) NOT NULL,
+    meal_type VARCHAR(20) NOT NULL,
+    recipeID INT,
+    FOREIGN KEY (userID) REFERENCES User(userID),
+    FOREIGN KEY (recipeID) REFERENCES Recipe(recipeID)
+);
+
+CREATE TABLE ShoppingList (
+    itemID INTEGER PRIMARY KEY AUTOINCREMENT,
+    userID INT NOT NULL,
+    recipeID INT,
+    ingreID INT,
+    input_item VARCHAR(50),
+    checked VARCHAR(10) DEFAULT 'no',
+    FOREIGN KEY (userID) REFERENCES User(userID),
+    FOREIGN KEY (recipeID, ingreID) REFERENCES Recipe_Ingredient(recipeID, ingreID),
+    CHECK (
+        (recipeID IS NULL AND ingreID IS NULL AND input_item IS NOT NULL) 
+        OR 
+        (recipeID IS NOT NULL AND ingreID IS NOT NULL AND input_item IS NULL)
+    )
+);

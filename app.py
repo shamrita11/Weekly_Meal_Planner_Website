@@ -1,4 +1,5 @@
 import os
+import sqlite3
 from functools import wraps
 from flask import Flask, render_template, session, redirect, url_for
 
@@ -78,6 +79,28 @@ def recipe_form():
 def profile():
     return render_template('profile.html')
 
+# database initialization
+def init_db():
+    db_path = './db/mydatabase.db'
+    schema_path = './db/schema.sql'
+
+    # If the database file is missing, we build it using the schema
+    if not os.path.exists(db_path):
+        if os.path.exists(schema_path):
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            with open(schema_path, 'r') as f:
+                cursor.executescript(f.read())
+                
+            conn.commit()
+            conn.close()
+            print("Database initialized.")
+        else:
+            print("Error: schema.sql not found in ./db/")
+
+# Run the initialization check before the app starts
+init_db()
 
 if __name__ == '__main__':
     app.run(debug=True)
