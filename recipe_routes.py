@@ -1,8 +1,12 @@
 import sqlite3
+import os
+import uuid
+import base64
 from flask import Blueprint, request, jsonify, session
 
 recipe_bp = Blueprint('recipe_bp', __name__)
-
+UPLOAD_FOLDER = os.path.join('static', 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def get_db_connection():
     conn = sqlite3.connect('./db/mydatabase.db')
@@ -13,6 +17,34 @@ def get_db_connection():
 def get_current_user():
     """Return the logged-in user's ID, or None."""
     return session.get('user_id')
+
+def process_and_save_image(image_data):
+    """
+    Assign a UUID filename to the image and save it to the local uploads folder,
+    return a UUID filename to the uploaded filename to ensure no image will be overwritten.
+    """
+    if image_data and image_data.startswith('/static/uploads/'):
+        return image_data.replace('/static/uploads/', '')
+
+    if not image_data or not image_data.startswith('data:image'):
+        return ""
+
+    try:
+        header, encoded_data = image_data.split(',', 1)
+        ext = header.split(';')[0].split('/')[1]
+        if ext == 'jpeg':
+            ext = 'jpg'
+
+        filename = f"{uuid.uuid4().hex}.{ext}"
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
+
+        with open(file_path, "wb") as f:
+            f.write(base64.b64decode(encoded_data))
+
+        return filename
+    except Exception as e:
+        print("Image save error:", e)
+        return ""
 
 
 # ── Load all recipes for the current user ──
@@ -65,7 +97,7 @@ def get_recipes():
                 "tags": tags,
                 "instructions": r_row['instructions'],
                 "favourite": True if r_row['favorites'] == 'yes' else False,
-                "image": r_row['image']
+                "image": f"/static/uploads/{r_row['image']}" if r_row['image'] else ""
             })
 
         return jsonify({"status": "success", "recipes": recipes_data}), 200
@@ -92,7 +124,9 @@ def save_recipe():
     tags = data.get('tags', [])
     instructions = data.get('instructions')
     favorites = 'yes' if data.get('favourite') else 'no'
-    image = data.get('image')
+
+    raw_image = data.get('image')
+    image = process_and_save_image(raw_image)
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -168,10 +202,11 @@ def delete_recipe(recipe_id):
             return jsonify({"status": "error", "message": "Recipe not found."}), 404
 
         # Delete references in mapping tables first to avoid Foreign Key constraint errors
+        cursor.execute('DELETE FROM ShoppingList WHERE recipeID = ? AND userID = ?', (recipe_id, uid))
         cursor.execute('DELETE FROM Recipe_Ingredient WHERE recipeID = ?', (recipe_id,))
         cursor.execute('DELETE FROM Recipe_Tag WHERE recipeID = ?', (recipe_id,))
         cursor.execute('DELETE FROM MealPlan WHERE recipeID = ?', (recipe_id,))
-        # Now it's safe to delete the recipe itself
+
         cursor.execute('DELETE FROM Recipe WHERE recipeID = ?', (recipe_id,))
 
         conn.commit()
@@ -200,7 +235,9 @@ def update_recipe(recipe_id):
     tags = data.get('tags', [])
     instructions = data.get('instructions')
     favorites = 'yes' if data.get('favourite') else 'no'
-    image = data.get('image')
+    
+    raw_image = data.get('image')
+    image = process_and_save_image(raw_image)
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -210,6 +247,13 @@ def update_recipe(recipe_id):
         cursor.execute('SELECT recipeID FROM Recipe WHERE recipeID = ? AND userID = ?', (recipe_id, uid))
         if not cursor.fetchone():
             return jsonify({"status": "error", "message": "Recipe not found."}), 404
+        
+        # Check how many times this recipe is currently in the MealPlan
+        cursor.execute('SELECT COUNT(*) as count FROM MealPlan WHERE recipeID = ? AND userID = ?', (recipe_id, uid))
+        mealplan_count = cursor.fetchone()['count']
+
+        # Wipe old ShoppingList entries for this recipe
+        cursor.execute('DELETE FROM ShoppingList WHERE recipeID = ? AND userID = ?', (recipe_id, uid))
 
         # Update the main Recipe table
         cursor.execute('''
@@ -236,10 +280,16 @@ def update_recipe(recipe_id):
                 cursor.execute('INSERT INTO Ingredient (ingredient) VALUES (?)', (ing_name,))
                 ing_id = cursor.lastrowid
 
-            cursor.execute('''
-                INSERT INTO Recipe_Ingredient (recipeID, ingreID, amount) 
-                VALUES (?, ?, ?)
-            ''', (recipe_id, ing_id, ing_amount))
+            cursor.execute(
+                "INSERT INTO Recipe_Ingredient (recipeID, ingreID, amount) VALUES (?, ?, ?);",
+                (recipe_id, ing_id, ing_amount))
+            
+            # Re-add this new ingredient to the ShoppingList based on the MealPlan count
+            for _ in range(mealplan_count):
+                cursor.execute('''
+                    INSERT INTO ShoppingList (userID, recipeID, ingreID, input_item, checked) 
+                    VALUES (?, ?, ?, NULL, 'no')
+                ''', (uid, recipe_id, ing_id))
 
         # Re-insert the updated ingredients
         for t in tags:
