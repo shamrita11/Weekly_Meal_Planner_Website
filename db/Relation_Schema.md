@@ -42,7 +42,6 @@ Note:
 - All primary keys use `INTEGER PRIMARY KEY AUTOINCREMENT` to avoid rowid reuse.
 - `login_id` in **User** is the **unique** identifier users log in with. `username` is their display name.
 - `password_hash` in **User** stores a bcrypt-hashed password — plaintext passwords are never stored.
-- `week_date` in **MealPlan** is the start date (Monday) of the week, which is helpful to display the meals history.
 - `ingredient` and `tag` can only be added if there's not such in the display, i.e. these attributes should be unique to reduce redundancy.
 - The attribute `image` in **Recipe** is the *filename* after being renamed by `uuid`, and the file will then be stored in `static/uploads/` folder locally.
 - `checked` in **ShoppingList** indicates if it should be removed from the database. If `checked=='yes'`, it'll be displayed as a strikethrough and the tuple will be removed in the database when users refresh the page.
