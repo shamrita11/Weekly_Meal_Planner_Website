@@ -13,7 +13,9 @@ let mealPlans = {};
 let mainWeekOffset = 0;
 let mpWeekOffset = 0;
 
-let shoppingList = ["Eggs", "Bread", "Blueberries", "Lettuce"];
+let recipeShoppingList = []; // each element looks like {title, count, ingredients: [{itemID, ingredient, checked}, ...]}
+let customShoppingList = []; // each element looks like {id: 1, name: "Eggs", checked: false}
+let shoppingList = [];
 
 let nextId = 3;
 let currentModalRecipeId = null;
@@ -32,9 +34,25 @@ function getMonday(offset) {
   return monday;
 }
 
+function toLocalDateString(d) {
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${day}`;
+}
+
 function weekKey(offset) {
   const m = getMonday(offset);
-  return m.toISOString().slice(0,10);
+  return toLocalDateString(m);
+}
+
+/** API sends ingredients as [amount, name] pairs. */
+function ingredientLineText(ing) {
+  if (!Array.isArray(ing)) return String(ing || '');
+  const amount = ing[0] != null ? String(ing[0]).trim() : '';
+  const name = ing[1] != null ? String(ing[1]).trim() : '';
+  if (!name) return amount;
+  return amount ? `${amount} ${name}` : name;
 }
 
 function getMealPlan(offset) {
@@ -134,29 +152,86 @@ function scrollRecipeStrip(dir) {
   container.style.transform = `translateX(-${stripScroll * thumbWidth}px)`;
 }
 
+// ══════════════════ SHOPPING LIST ══════════════════
 function renderShoppingList() {
   const ul = document.getElementById('shopping-list');
   ul.innerHTML = '';
-  shoppingList.forEach((item, idx) => {
-    const li = document.createElement('li');
-    li.className = 'shop-item';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.id = 'shop-cb-' + idx;
-    cb.className = 'shop-cb';
-    const circle = document.createElement('span');
-    circle.className = 'shop-circle';
-    const label = document.createElement('label');
-    label.htmlFor = 'shop-cb-' + idx;
-    label.className = 'shop-label';
-    label.textContent = item;
-    li.appendChild(cb);
-    li.appendChild(circle);
-    li.appendChild(label);
-    // clicking the circle manually toggles the checkbox
-    circle.addEventListener('click', () => { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); circle.classList.toggle('checked', cb.checked); label.classList.toggle('checked', cb.checked); });
-    ul.appendChild(li);
+  
+  const recipeTemplate = document.getElementById('recipe-box-template');
+  const itemTemplate = document.getElementById('shop-item-template');
+
+  // Render Grouped Recipe Items
+  recipeShoppingList.forEach(recipe => {
+    const boxClone = recipeTemplate.content.cloneNode(true);
+    
+    boxClone.querySelector('.recipe-title-text').textContent = recipe.title;
+    if (recipe.count >= 2) {
+      boxClone.querySelector('.recipe-multiplier').textContent = `x ${recipe.count}`;
+    }
+
+    const ingContainer = boxClone.querySelector('.ingredient-container');
+
+    // Fill in the ingredients
+    recipe.ingredients.forEach(item => {
+      const itemClone = createItemFromTemplate(itemTemplate, item);
+      ingContainer.appendChild(itemClone);
+    });
+
+    ul.appendChild(boxClone);
   });
+
+  // Render Custom Input Items
+  customShoppingList.forEach((item) => {
+    const itemClone = createItemFromTemplate(itemTemplate, item);
+    ul.appendChild(itemClone);
+  });
+}
+
+
+function createItemFromTemplate(template, itemData) {
+  const clone = template.content.cloneNode(true);
+  
+  const cb = clone.querySelector('.shop-cb');
+  cb.id = 'shop-cb-' + itemData.id;
+  cb.checked = itemData.checked;
+
+  const label = clone.querySelector('.shop-label');
+  label.htmlFor = 'shop-cb-' + itemData.id;
+  label.textContent = itemData.name;
+
+  const circle = clone.querySelector('.shop-circle');
+  circle.addEventListener('click', () => {
+    const newChecked = !cb.checked;
+    cb.checked = newChecked;
+    itemData.checked = newChecked;
+    toggleShopItemDB(itemData.id, newChecked);
+  });
+
+  return clone;
+}
+
+function toggleShopItemDB(itemId, isChecked) {
+  fetch(`/shop/toggle/${itemId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ checked: isChecked })
+  }).catch(err => console.error('Error toggling item:', err));
+}
+
+function loadShoppingListFromDB(callback) {
+  fetch('/shop/get')
+    .then(response => response.json())
+    .then(data => {
+      if (data.status === 'success') {
+        // Correctly assign the two new data arrays from the Python route
+        recipeShoppingList = data.recipe_items || [];
+        customShoppingList = data.custom_items || [];
+        if (callback) callback();
+      } else {
+        console.error('Failed to load shopping list:', data.message);
+      }
+    })
+    .catch(err => console.error('Error fetching shopping list:', err));
 }
 
 function addShopItem(e) {
@@ -164,11 +239,51 @@ function addShopItem(e) {
     const input = document.getElementById('shop-input');
     const val = input.value.trim();
     if (val) {
-      shoppingList.push(val);
-      input.value = '';
-      renderShoppingList();
+      // Save to database first
+      fetch('/shop/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input_item: val })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === 'success') {
+          // Push strictly to the custom list using the new DB itemID
+          customShoppingList.push({ id: data.id, name: val, checked: false });
+          input.value = '';
+          renderShoppingList();
+        } else {
+          alert('Failed to add item: ' + data.message);
+        }
+      })
+      .catch(err => console.error('Error adding item:', err));
     }
   }
+}
+
+function clearShoppingList() {
+  // Check both new arrays to see if the list is already empty
+  if (recipeShoppingList.length === 0 && customShoppingList.length === 0) return; 
+  
+  if (!confirm('Are you sure you want to clear your entire shopping list?')) {
+    return;
+  }
+
+  fetch('/shop/clear', {
+    method: 'DELETE'
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === 'success') {
+      // Empty both local arrays and re-render the UI
+      recipeShoppingList = [];
+      customShoppingList = [];
+      renderShoppingList();
+    } else {
+      alert('Failed to clear list: ' + data.message);
+    }
+  })
+  .catch(err => console.error('Error clearing shopping list:', err));
 }
 
 // ══════════════════ PLAN GRID ══════════════════
@@ -256,8 +371,9 @@ function renderCellPickerGrid(query) {
 
   const filtered = recipes.filter(r => {
     if (!query) return true;
+    const tags = r.tags || [];
     return r.name.toLowerCase().includes(query) ||
-           r.tags.some(t => t.toLowerCase().includes(query));
+           tags.some(t => t.toLowerCase().includes(query));
   });
 
   filtered.forEach(r => {
@@ -307,13 +423,8 @@ function assignRecipeToCell(recipeId) {
   .then(response => response.json())
   .then(data => {
     if (data.status === 'success') {
-      // Only update the UI if the database successfully saved the change
-      const plan = getMealPlan(pendingCell.weekOffset || 0);
-      plan[pendingCell.dayIdx][pendingCell.mealIdx] = recipeId;
-      
-      document.getElementById('cell-picker').classList.remove('open');
-      renderPlanGrid(pendingCell.gridId, pendingCell.weekOffset || 0);
-      pendingCell = null;
+      // Reload the page to automatically fetch the new grid and new shopping list
+      window.location.reload();
     } else {
       alert('Database Error: ' + data.message);
     }
@@ -348,9 +459,11 @@ function renderRecipeGrids(query) {
 
   const filtered = recipes.filter(r => {
     if (!query) return true;
+    const tags = r.tags || [];
+    const ings = r.ingredients || [];
     return r.name.toLowerCase().includes(query) ||
-           r.tags.some(t => t.toLowerCase().includes(query)) ||
-           r.ingredients.some(i => i.toLowerCase().includes(query));
+           tags.some(t => t.toLowerCase().includes(query)) ||
+           ings.some(i => ingredientLineText(i).toLowerCase().includes(query));
   });
 
   const favs = filtered.filter(r => r.favourite);
@@ -411,9 +524,9 @@ function openRecipeModal(id) {
 
   const ul = document.getElementById('modal-ingredients');
   ul.innerHTML = '';
-  r.ingredients.forEach(ing => {
+  (r.ingredients || []).forEach(ing => {
     const li = document.createElement('li');
-    li.textContent = ing;
+    li.textContent = ingredientLineText(ing);
     ul.appendChild(li);
   });
 
@@ -448,18 +561,46 @@ function closeModal(e) {
 
 function toggleModalFavourite() {
   if (!currentModalRecipeId) return;
+  
   const r = recipes.find(x => x.id === currentModalRecipeId);
   if (!r) return;
-  r.favourite = !r.favourite;
-  const favBtn = document.getElementById('modal-fav-btn');
-  if (r.favourite) {
-    favBtn.textContent = '★ Favourited';
-    favBtn.classList.add('is-fav');
-  } else {
-    favBtn.textContent = '⭐ Add to Favourites';
-    favBtn.classList.remove('is-fav');
-  }
-  syncStats();
+
+  // Send a POST request to the backend to toggle the status
+  fetch(`/recipe/toggle-fav/${currentModalRecipeId}`, {
+    method: 'POST'
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === 'success') {
+      // Update the local array
+      r.favourite = data.favourite;
+      
+      // Update the UI button inside the modal
+      const favBtn = document.getElementById('modal-fav-btn');
+      if (r.favourite) {
+        favBtn.textContent = '★ Favourited';
+        favBtn.classList.add('is-fav');
+      } else {
+        favBtn.textContent = '⭐ Add to Favourites';
+        favBtn.classList.remove('is-fav');
+      }
+      
+      // Sync stats to localStorage
+      syncStats();
+
+      // If we are on the Recipes page, re-render the grid so the recipe 
+      // instantly appears/disappears from the "Favourites" section
+      if (window.location.pathname === '/recipes') {
+        filterRecipes();
+      }
+    } else {
+      alert('Database Error: ' + data.message);
+    }
+  })
+  .catch(error => {
+    console.error('Error toggling favourite:', error);
+    alert('Failed to connect to the server.');
+  });
 }
 
 function editCurrentRecipe() {
@@ -469,46 +610,229 @@ function editCurrentRecipe() {
 }
 
 // ══════════════════ RECIPE FORM ══════════════════
+let recipeFormTags = [];
+
+function buildIngredientRowElement(amount = '', name = '') {
+  const row = document.createElement('div');
+  row.className = 'ingredient-row';
+  const line = document.createElement('div');
+  line.className = 'ingredient-line';
+  const inpA = document.createElement('input');
+  inpA.type = 'text';
+  inpA.className = 'form-input ing-amount';
+  inpA.placeholder = '1 cup';
+  inpA.value = amount;
+  const wrap = document.createElement('div');
+  wrap.className = 'ing-name-with-actions';
+  const inpN = document.createElement('input');
+  inpN.type = 'text';
+  inpN.className = 'form-input ing-name';
+  inpN.placeholder = 'rice';
+  inpN.value = name;
+  wrap.appendChild(inpN);
+  line.appendChild(inpA);
+  line.appendChild(wrap);
+  row.appendChild(line);
+  return row;
+}
+
+/** Last row gets +; other rows get ×. Same name column width as tags row (1fr + 44px). */
+function refreshIngredientRowControls() {
+  const container = document.getElementById('ingredients-rows');
+  if (!container) return;
+  const rows = container.querySelectorAll('.ingredient-row');
+  rows.forEach((row, index) => {
+    const wrap = row.querySelector('.ing-name-with-actions');
+    if (!wrap) return;
+    const old = wrap.querySelector('.ing-add-row-btn, .ing-row-remove');
+    if (old) old.remove();
+    const isLast = index === rows.length - 1;
+    if (isLast) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ing-add-row-btn';
+      btn.id = 'ing-add-row';
+      btn.setAttribute('aria-label', 'Add ingredient row');
+      btn.textContent = '+';
+      btn.addEventListener('click', () => addIngredientRow('', ''));
+      wrap.appendChild(btn);
+    } else {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ing-row-remove';
+      btn.setAttribute('aria-label', 'Remove row');
+      btn.textContent = '×';
+      btn.addEventListener('click', () => removeIngredientRow(btn));
+      wrap.appendChild(btn);
+    }
+  });
+}
+
+function addIngredientRow(amount = '', name = '') {
+  const container = document.getElementById('ingredients-rows');
+  if (!container) return;
+  container.appendChild(buildIngredientRowElement(amount, name));
+  refreshIngredientRowControls();
+}
+
+function removeIngredientRow(btn) {
+  const row = btn.closest('.ingredient-row');
+  const container = document.getElementById('ingredients-rows');
+  if (!row || !container) return;
+  if (container.querySelectorAll('.ingredient-row').length <= 1) return;
+  row.remove();
+  refreshIngredientRowControls();
+}
+
+function clearIngredientRows() {
+  const container = document.getElementById('ingredients-rows');
+  if (!container) return;
+  container.innerHTML = '';
+  addIngredientRow('', '');
+}
+
+function gatherIngredientsFromForm() {
+  const container = document.getElementById('ingredients-rows');
+  if (!container) return [];
+  const out = [];
+  container.querySelectorAll('.ingredient-row').forEach((row) => {
+    const amount = row.querySelector('.ing-amount')?.value.trim() ?? '';
+    const name = row.querySelector('.ing-name')?.value.trim() ?? '';
+    if (name) out.push([amount, name]);
+  });
+  return out;
+}
+
+function renderTagChips() {
+  const el = document.getElementById('tag-chips');
+  if (!el) return;
+  el.innerHTML = '';
+  recipeFormTags.forEach((tag) => {
+    const chip = document.createElement('span');
+    chip.className = 'tag-chip';
+    chip.appendChild(document.createTextNode(tag));
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.textContent = '×';
+    x.onclick = () => removeFormTag(tag);
+    chip.appendChild(x);
+    el.appendChild(chip);
+  });
+}
+
+function addTagFromInput() {
+  const inp = document.getElementById('tag-input');
+  if (!inp) return;
+  const raw = inp.value.trim().toLowerCase();
+  if (!raw) return;
+  if (!recipeFormTags.includes(raw)) recipeFormTags.push(raw);
+  inp.value = '';
+  renderTagChips();
+}
+
+function removeFormTag(tag) {
+  recipeFormTags = recipeFormTags.filter((t) => t !== tag);
+  renderTagChips();
+}
+
+function setTagsFromArray(tags) {
+  recipeFormTags = [
+    ...new Set(
+      (tags || [])
+        .map((t) => String(t).trim().toLowerCase())
+        .filter(Boolean)
+    ),
+  ];
+  renderTagChips();
+}
+
+function setRecipeFormFavourite(isFav) {
+  const btn = document.getElementById('f-fav-btn');
+  if (!btn) return;
+  btn.classList.toggle('is-fav', !!isFav);
+  btn.setAttribute('aria-pressed', isFav ? 'true' : 'false');
+}
+
+function toggleRecipeFormFavourite() {
+  const btn = document.getElementById('f-fav-btn');
+  if (!btn) return;
+  btn.classList.toggle('is-fav');
+  btn.setAttribute('aria-pressed', btn.classList.contains('is-fav') ? 'true' : 'false');
+}
+
+function resetRecipeForm() {
+  const title = document.getElementById('form-title');
+  if (title) title.textContent = 'New Recipe';
+  const name = document.getElementById('f-name');
+  if (name) name.value = '';
+  const time = document.getElementById('f-time');
+  if (time) time.value = '';
+  const instr = document.getElementById('f-instructions');
+  if (instr) instr.value = '';
+  setRecipeFormFavourite(false);
+  const eid = document.getElementById('f-editing-id');
+  if (eid) eid.value = '';
+  const fn = document.getElementById('f-image-name');
+  if (fn) fn.textContent = 'No file chosen';
+  const prev = document.getElementById('f-image-preview');
+  if (prev) {
+    prev.style.display = 'none';
+    prev.src = '';
+  }
+  const fi = document.getElementById('f-image-file');
+  if (fi) fi.value = '';
+  clearIngredientRows();
+  recipeFormTags = [];
+  renderTagChips();
+  const ti = document.getElementById('tag-input');
+  if (ti) ti.value = '';
+}
+
+function populateRecipeFormFromRecipe(r) {
+  const title = document.getElementById('form-title');
+  if (title) title.textContent = 'Edit Recipe';
+  const name = document.getElementById('f-name');
+  if (name) name.value = r.name || '';
+  const time = document.getElementById('f-time');
+  if (time) time.value = r.time || '';
+  const instr = document.getElementById('f-instructions');
+  if (instr) instr.value = r.instructions || '';
+  setRecipeFormFavourite(!!r.favourite);
+  const eid = document.getElementById('f-editing-id');
+  if (eid) eid.value = r.id;
+
+  const container = document.getElementById('ingredients-rows');
+  if (container) {
+    container.innerHTML = '';
+    const pairs = (r.ingredients || []).filter(
+      (ing) => Array.isArray(ing) && ing[1] && String(ing[1]).trim()
+    );
+    if (pairs.length === 0) addIngredientRow('', '');
+    else pairs.forEach((ing) => addIngredientRow(ing[0] || '', ing[1] || ''));
+  }
+  setTagsFromArray(r.tags);
+
+  const imgPrev = document.getElementById('f-image-preview');
+  const imgName = document.getElementById('f-image-name');
+  if (r.image && imgPrev) {
+    imgPrev.src = r.image;
+    imgPrev.style.display = 'inline-block';
+    if (imgName) imgName.textContent = 'Current image';
+  } else {
+    if (imgPrev) {
+      imgPrev.src = '';
+      imgPrev.style.display = 'none';
+    }
+    if (imgName) imgName.textContent = 'No file chosen';
+  }
+}
+
 function openNewRecipe() {
-  document.getElementById('form-title').textContent = 'New Recipe';
-  document.getElementById('f-name').value = '';
-  document.getElementById('f-ingredients').value = '';
-  document.getElementById('f-time').value = '';
-  document.getElementById('f-tags').value = '';
-  document.getElementById('f-instructions').value = '';
-  document.getElementById('f-fav').checked = false;
-  document.getElementById('f-editing-id').value = '';
-  document.getElementById('f-delete-btn').style.display = 'none';
-  document.getElementById('f-image-name').textContent = 'No file chosen';
-  document.getElementById('f-image-preview').style.display = 'none';
-  document.getElementById('f-image-preview').src = '';
-  navigate('recipe-form');
+  window.location.href = '/recipe/new';
 }
 
 function openEditRecipe(id) {
-  const r = recipes.find(x => x.id === id);
-  if (!r) return;
-
-  document.getElementById('form-title').textContent = 'Edit Recipe';
-  document.getElementById('f-name').value = r.name;
-  document.getElementById('f-ingredients').value = r.ingredients.join('\n');
-  document.getElementById('f-time').value = r.time || '';
-  document.getElementById('f-tags').value = r.tags.join(', ');
-  document.getElementById('f-instructions').value = r.instructions || '';
-  document.getElementById('f-fav').checked = r.favourite;
-  document.getElementById('f-editing-id').value = id;
-  document.getElementById('f-delete-btn').style.display = 'inline-block';
-
-  if (r.image) {
-    document.getElementById('f-image-preview').src = r.image;
-    document.getElementById('f-image-preview').style.display = 'inline-block';
-    document.getElementById('f-image-name').textContent = 'Current image';
-  } else {
-    document.getElementById('f-image-name').textContent = 'No file chosen';
-    document.getElementById('f-image-preview').style.display = 'none';
-  }
-
-  navigate('recipe-form');
+  window.location.href = '/recipe/new?edit=' + encodeURIComponent(id);
 }
 
 function previewImage(event) {
@@ -581,42 +905,36 @@ function createNewRecipe(recipeData) {
 
 function saveRecipe() {
   const name = document.getElementById('f-name').value.trim();
-  const ingredientsRaw = document.getElementById('f-ingredients').value.trim();
+  const ingredients = gatherIngredientsFromForm();
   const time = document.getElementById('f-time').value.trim();
-  const tagsRaw = document.getElementById('f-tags').value.trim();
+  const tags = [...recipeFormTags];
   const instructions = document.getElementById('f-instructions').value.trim();
-  const fav = document.getElementById('f-fav').checked;
+  const favBtn = document.getElementById('f-fav-btn');
+  const fav = favBtn ? favBtn.classList.contains('is-fav') : false;
   const editingId = document.getElementById('f-editing-id').value;
   const imagePreview = document.getElementById('f-image-preview');
 
-  if (!name || !ingredientsRaw) {
-    alert('Please fill in Recipe title and Ingredients.');
+  if (!name) {
+    alert('Please enter a recipe name.');
+    return;
+  }
+  if (ingredients.length === 0) {
+    alert('Add at least one ingredient with a name (and optionally an amount).');
+    return;
+  }
+  if (tags.length === 0) {
+    alert('Add at least one tag using the tag field and + button.');
+    return;
+  }
+  if (!instructions) {
+    alert('Please fill in the instructions.');
     return;
   }
 
-  // ------------------- NEED REFACTORED For Recipe-save ----------------------------------------------------------//
-  // We atcually don't want users to use '\n' and ',' to split the ingredients
-  // Instead, we can use a table-like format to get the input
-  // Also, for ingredients, we need two column -- one for amount, one for ingredient's name
-  // So the UI may look like:
-  //              ------------------------------
-  // Ingredients: | (amount) | (ingredient)    | <-- A list of tuple: list{(amount, ingredient)}, where amount and ingr are both strings
-  //              ------------------------------     In js, it's array of arrays [["1 cup", "rice"], ["2", "onions"]]
-  //              |____________+_______________ | <- tap to add a new ingredient
-  //
-  //       __________________
-  //  Tag: |_Tag_____|__+____| <-- A list of tags
-  //
-  // Once you done that in html, can you also fix the following code:
- const ingredients = ingredientsRaw.split('\n').map(s => { // No longer use split by '\n'
-    const parts = s.trim().toLowerCase();
-    const amount;
-    const ingName;
-    return { amount: amount || '', name: ingName || '' };
-  }).filter(item => item.name !== ''); 
-  
-  const tags = tagsRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean); // No longer use split by ','
-  const imageData = imagePreview.src && imagePreview.style.display !== 'none' ? imagePreview.src : '';
+  const imageData =
+    imagePreview && imagePreview.src && imagePreview.style.display !== 'none'
+      ? imagePreview.src
+      : '';
 
   const recipeData = {
     name: name,
@@ -625,7 +943,7 @@ function saveRecipe() {
     tags: tags,
     instructions: instructions,
     favourite: fav,
-    image: imageData
+    image: imageData,
   };
 
   if (editingId) {
@@ -636,13 +954,11 @@ function saveRecipe() {
 }
 
 
-// I'll revisit it later especially for meal plan part
 function deleteRecipe() {
   const editingId = parseInt(document.getElementById('f-editing-id').value);
   if (!editingId) return;
   if (!confirm('Remove this recipe?')) return;
 
-  // Send a DELETE request to the Flask backend
   fetch(`/recipe/delete/${editingId}`, {
     method: 'DELETE'
   })
@@ -700,7 +1016,11 @@ function loadRecipesFromDB(callback) {
     .then(response => response.json())
     .then(data => {
       if (data.status === 'success') {
-        recipes = data.recipes; // Populate the global recipes array with DB data
+        recipes = (data.recipes || []).map((r) => ({
+          ...r,
+          tags: Array.isArray(r.tags) ? r.tags : [],
+          ingredients: Array.isArray(r.ingredients) ? r.ingredients : [],
+        }));
         if (callback) callback(); // Run the page render functions now that we have data
       } else {
         console.error('Failed to load recipes:', data.message);
@@ -732,7 +1052,9 @@ function loadMealPlansFromDB(callback) {
               mealPlans[weekKey] = Array.from({length:7}, () => [null,null,null]);
             }
             // Slot the recipe ID into the exact grid coordinate
-            mealPlans[weekKey][dayIdx][mealIdx] = plan.recipe_id;
+            const rid = plan.recipe_id;
+            mealPlans[weekKey][dayIdx][mealIdx] =
+              rid != null && rid !== '' ? Number(rid) : null;
           }
         });
         
@@ -759,8 +1081,32 @@ document.addEventListener('DOMContentLoaded', function() {
     } else if (path === '/mealplan') {
       renderMealPlanPage();
     } else if (path === '/recipe/new') {
+      const tagInput = document.getElementById('tag-input');
+      if (tagInput) {
+        tagInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            addTagFromInput();
+          }
+        });
+      }
+      const params = new URLSearchParams(window.location.search);
+      const editId = params.get('edit');
       const delBtn = document.getElementById('f-delete-btn');
-      if (delBtn) delBtn.style.display = 'none';
+      if (editId) {
+        const id = parseInt(editId, 10);
+        const r = recipes.find((x) => x.id === id);
+        if (r) {
+          populateRecipeFormFromRecipe(r);
+          if (delBtn) delBtn.style.display = 'inline-block';
+        } else {
+          resetRecipeForm();
+          if (delBtn) delBtn.style.display = 'none';
+        }
+      } else {
+        resetRecipeForm();
+        if (delBtn) delBtn.style.display = 'none';
+      }
     }
   };
 
@@ -768,10 +1114,14 @@ document.addEventListener('DOMContentLoaded', function() {
   loadRecipesFromDB(() => {
     // 2. Then fetch Meal Plans
     loadMealPlansFromDB(() => {
-      // 3. Finally, render the UI with all the data ready
-      initializePageUI();
+      // 3. Then fetch Shopping List
+      loadShoppingListFromDB(() => {
+        // 4. Finally, render the UI with all the data ready
+        initializePageUI();
+      });
     });
   });
+
 });
 
 // ══════════════════ RESIZE HANDLE ══════════════════
@@ -782,6 +1132,7 @@ let startRecipesHeight = 0;
 
 document.addEventListener('DOMContentLoaded', function() {
   const handle = document.getElementById('resize-handle');
+  if (!handle) return;
 
   handle.addEventListener('mousedown', function(e) {
     const planSection = document.querySelector('#page-main .plan-section');
@@ -811,6 +1162,7 @@ document.addEventListener('mousemove', function(e) {
   const delta = e.clientY - startY;
   const planSection = document.querySelector('#page-main .plan-section');
   const recipesSection = document.querySelector('#page-main .recipes-section');
+  if (!planSection || !recipesSection) return;
   planSection.style.flex = 'none';
   planSection.style.height = Math.max(80, startPlanHeight + delta) + 'px';
   recipesSection.style.flex = 'none';
@@ -829,6 +1181,7 @@ document.addEventListener('touchmove', function(e) {
   const delta = e.touches[0].clientY - startY;
   const planSection = document.querySelector('#page-main .plan-section');
   const recipesSection = document.querySelector('#page-main .recipes-section');
+  if (!planSection || !recipesSection) return;
   planSection.style.flex = 'none';
   planSection.style.height = Math.max(80, startPlanHeight + delta) + 'px';
   recipesSection.style.flex = 'none';

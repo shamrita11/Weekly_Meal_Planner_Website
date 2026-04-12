@@ -15,6 +15,7 @@ def get_current_user():
 
 
 # ── Save / Update / Clear a single meal plan cell ──
+# The corresponding js function that sends the request is assignRecipeToCell
 @mealplan_bp.route('/mealplan/sync', methods=['POST'])
 def save_mealplan():
     uid = get_current_user()
@@ -25,33 +26,64 @@ def save_mealplan():
     week_date = data.get('week_date')
     day = data.get('day')
     meal_type = data.get('meal_type')
-    recipe_id = data.get('recipe_id')
+    recipe_id = data.get('recipe_id') # This will be None if the user is clearing the cell
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
-        # Check if this cell already exists for this user
+        # Check what is currently sitting in this cell
         cursor.execute('''
-            SELECT mID FROM MealPlan 
+            SELECT mID, recipeID FROM MealPlan 
             WHERE userID = ? AND week_date = ? AND day = ? AND meal_type = ?
         ''', (uid, week_date, day, meal_type))
         row = cursor.fetchone()
+        
+        old_recipe_id = row['recipeID'] if row else None
+        # If they assign the exact same recipe back and forth, do nothing to ensure
+        # the consistency of the shopping list
+        if old_recipe_id == recipe_id:
+            return jsonify({"status": "success"}), 200
 
+        # -- Remove old recipe's ingre from shopping list--
+        if old_recipe_id:
+            cursor.execute('SELECT ingreID FROM Recipe_Ingredient WHERE recipeID = ?', (old_recipe_id,))
+            old_ings = cursor.fetchall()
+            
+            for ing in old_ings:
+                cursor.execute('''
+                    DELETE FROM ShoppingList 
+                    WHERE itemID = (
+                        SELECT itemID FROM ShoppingList 
+                        WHERE userID = ? AND recipeID = ? AND ingreID = ?
+                        LIMIT 1
+                    )
+                ''', (uid, old_recipe_id, ing['ingreID']))
+        
+        # -- Update the MealPlan grid --
         if recipe_id is None:
+            # User clicked clear
             if row:
                 cursor.execute('DELETE FROM MealPlan WHERE mID = ?', (row['mID'],))
         else:
+            # User assigned a new recipe
             if row:
-                cursor.execute(
-                    'UPDATE MealPlan SET recipeID = ? WHERE mID = ?',
-                    (recipe_id, row['mID'])
-                )
+                cursor.execute('UPDATE MealPlan SET recipeID = ? WHERE mID = ?', (recipe_id, row['mID']))
             else:
                 cursor.execute('''
                     INSERT INTO MealPlan (userID, week_date, day, meal_type, recipeID) 
                     VALUES (?, ?, ?, ?, ?)
                 ''', (uid, week_date, day, meal_type, recipe_id))
+
+        # -- Add new ingredients to shopping list --
+        cursor.execute('SELECT ingreID FROM Recipe_Ingredient WHERE recipeID = ?', (recipe_id,))
+        new_ings = cursor.fetchall()
+        
+        for ing in new_ings:
+            cursor.execute('''
+                INSERT INTO ShoppingList (userID, recipeID, ingreID, input_item, checked) 
+                VALUES (?, ?, ?, NULL, 'no')
+            ''', (uid, recipe_id, ing['ingreID']))
 
         conn.commit()
         return jsonify({"status": "success"}), 200
@@ -64,6 +96,7 @@ def save_mealplan():
 
 
 # ── Load all meal plan entries for the current user ──
+# The corresponding js func is loadRecipesFromDB
 @mealplan_bp.route('/mealplan/get', methods=['GET'])
 def get_mealplans():
     uid = get_current_user()
