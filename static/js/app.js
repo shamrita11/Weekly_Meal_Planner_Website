@@ -983,10 +983,21 @@ function syncStats() {
 // ══════════════════ THEME TOGGLE ══════════════════
 let isDark = localStorage.getItem('theme') !== 'light';
 
+/** Welcome + auth pages always use the default dark theme (saved preference applies on app pages). */
+function isPublicLandingPath() {
+  const p = window.location.pathname;
+  return p === '/' || p === '/login' || p === '/signup';
+}
+
 function applyTheme() {
+  if (isPublicLandingPath()) {
+    document.body.classList.remove('light');
+    return;
+  }
+  isDark = localStorage.getItem('theme') !== 'light';
   document.body.classList.toggle('light', !isDark);
   const label = isDark ? '🌙 Dark' : '☀️ Light';
-  document.querySelectorAll('.theme-toggle').forEach(btn => btn.textContent = label);
+  document.querySelectorAll('.theme-toggle').forEach(btn => (btn.textContent = label));
 }
 
 function toggleTheme() {
