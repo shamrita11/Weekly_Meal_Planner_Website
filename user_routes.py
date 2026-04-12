@@ -42,6 +42,7 @@ def signup():
         conn.commit()
 
         # Automatically log in the new user
+        session.permanent = True
         session['user_id'] = cursor.lastrowid
         session['username'] = username
 
@@ -79,6 +80,7 @@ def login():
             return jsonify({"status": "error", "message": "Invalid User ID or password."}), 401
 
         # Store user info in the session cookie
+        session.permanent = True
         session['user_id'] = user['userID']
         session['username'] = user['username']
 
