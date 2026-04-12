@@ -18,6 +18,26 @@ def get_current_user():
     """Return the logged-in user's ID, or None."""
     return session.get('user_id')
 
+def parse_ingredients_list(raw_list):
+    """
+    Build [[amount, name], ...] keeping only rows with a non-empty ingredient name.
+    Amount may be empty.
+    """
+    out = []
+    if not raw_list:
+        return out
+    for item in raw_list:
+        if not isinstance(item, (list, tuple)) or len(item) < 2:
+            continue
+        ing_amount, ing_name = item[0], item[1]
+        ing_name = (ing_name or '').strip() if ing_name is not None else ''
+        if not ing_name:
+            continue
+        amt = (ing_amount or '').strip() if ing_amount is not None else ''
+        out.append([amt, ing_name])
+    return out
+
+
 def process_and_save_image(image_data):
     """
     Assign a UUID filename to the image and save it to the local uploads folder,
@@ -118,12 +138,17 @@ def save_recipe():
 
     data = request.get_json()
 
-    title = data.get('name')
-    ingredients = data.get('ingredients', [])
-    cook_time = data.get('time')
-    tags = data.get('tags', [])
-    instructions = data.get('instructions')
+    title = (data.get('name') or '').strip()
+    ingredients = parse_ingredients_list(data.get('ingredients', []))
+    cook_time = (data.get('time') or '').strip() or None
+    tags = data.get('tags') or []
+    instructions = (data.get('instructions') or '').strip() or None
     favorites = 'yes' if data.get('favourite') else 'no'
+
+    if not title:
+        return jsonify({"status": "error", "message": "Recipe name is required."}), 400
+    if not ingredients:
+        return jsonify({"status": "error", "message": "At least one ingredient is required."}), 400
 
     raw_image = data.get('image')
     image = process_and_save_image(raw_image)
@@ -142,10 +167,6 @@ def save_recipe():
         # Insert into Ingredient and Recipe_Ingredient tables
         # EXPECTING ingredients to be a list of lists/tuples: [['1 cup', 'rice'], ['2', 'onions']]
         for ing_amount, ing_name in ingredients:
-            ing_name = ing_name.strip()
-            if not ing_name:
-                continue
-
             cursor.execute('SELECT ingreID FROM Ingredient WHERE ingredient = ?', (ing_name,))
             row = cursor.fetchone()
             if row:
@@ -229,13 +250,18 @@ def update_recipe(recipe_id):
 
     data = request.get_json()
 
-    title = data.get('name')
-    ingredients = data.get('ingredients', [])
-    cook_time = data.get('time')
-    tags = data.get('tags', [])
-    instructions = data.get('instructions')
+    title = (data.get('name') or '').strip()
+    ingredients = parse_ingredients_list(data.get('ingredients', []))
+    cook_time = (data.get('time') or '').strip() or None
+    tags = data.get('tags') or []
+    instructions = (data.get('instructions') or '').strip() or None
     favorites = 'yes' if data.get('favourite') else 'no'
-    
+
+    if not title:
+        return jsonify({"status": "error", "message": "Recipe name is required."}), 400
+    if not ingredients:
+        return jsonify({"status": "error", "message": "At least one ingredient is required."}), 400
+
     raw_image = data.get('image')
     image = process_and_save_image(raw_image)
 
@@ -268,10 +294,6 @@ def update_recipe(recipe_id):
 
         # Re-insert the updated ingredients
         for ing_amount, ing_name in ingredients:
-            ing_name = ing_name.strip()
-            if not ing_name:
-                continue
-
             cursor.execute('SELECT ingreID FROM Ingredient WHERE ingredient = ?', (ing_name,))
             row = cursor.fetchone()
             if row:
@@ -291,7 +313,7 @@ def update_recipe(recipe_id):
                     VALUES (?, ?, ?, NULL, 'no')
                 ''', (uid, recipe_id, ing_id))
 
-        # Re-insert the updated ingredients
+        # Re-insert tags
         for t in tags:
             t = t.strip()
             if not t:
