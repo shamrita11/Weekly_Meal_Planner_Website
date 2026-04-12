@@ -1,6 +1,7 @@
 import os
 import sqlite3
 from functools import wraps
+from datetime import timedelta
 from flask import Flask, render_template, session, redirect, url_for
 
 from recipe_routes import recipe_bp
@@ -12,6 +13,8 @@ app = Flask(__name__)
 
 # Secret key for signing session cookies in production, using an env variable
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-in-production')
+# Session is valid for 7 days
+app.permanent_session_lifetime = timedelta(days=7)
 
 # Initialize bcrypt with the Flask app for password hashing
 bcrypt.init_app(app)
