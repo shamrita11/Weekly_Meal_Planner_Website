@@ -262,17 +262,27 @@ def update_recipe(recipe_id):
     if not ingredients:
         return jsonify({"status": "error", "message": "At least one ingredient is required."}), 400
 
-    raw_image = data.get('image')
-    image = process_and_save_image(raw_image)
-
     conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
         # Verify ownership
-        cursor.execute('SELECT recipeID FROM Recipe WHERE recipeID = ? AND userID = ?', (recipe_id, uid))
-        if not cursor.fetchone():
+        cursor.execute('SELECT recipeID, image FROM Recipe WHERE recipeID = ? AND userID = ?', (recipe_id, uid))
+        recipe_row = cursor.fetchone()
+        if not recipe_row:
             return jsonify({"status": "error", "message": "Recipe not found."}), 404
+        
+        existing_image = recipe_row['image']
+        raw_image = data.get('image')
+
+        # Every Base64 image string looks like: "data:image/type;base64"
+        if raw_image and raw_image.startswith('data:image'): # A completely new image was uploaded
+            image = process_and_save_image(raw_image)
+        elif raw_image and existing_image and existing_image in raw_image: # "f47ac10b.jpg" in "/static/uploads/f47ac10b.jpg"
+            image = existing_image
+        else:
+            # No valid new image data was sent (e.g. file input was empty), keep the existing one
+            image = existing_image
         
         # Check how many times this recipe is currently in the MealPlan
         cursor.execute('SELECT COUNT(*) as count FROM MealPlan WHERE recipeID = ? AND userID = ?', (recipe_id, uid))
