@@ -1161,10 +1161,18 @@ document.addEventListener('mousemove', function(e) {
   const planSection = document.querySelector('#page-main .plan-section');
   const recipesSection = document.querySelector('#page-main .recipes-section');
   if (!planSection || !recipesSection) return;
+
+  const totalHeight = startPlanHeight + startRecipesHeight;
+  const minHeight = 80; // Minimum allowed height for either section
+  const maxPlanHeight = totalHeight - minHeight; 
+  let newPlanHeight = Math.max(minHeight, Math.min(startPlanHeight + delta, maxPlanHeight));
+  
+  let newRecipesHeight = totalHeight - newPlanHeight;
+
   planSection.style.flex = 'none';
-  planSection.style.height = Math.max(80, startPlanHeight + delta) + 'px';
+  planSection.style.height = newPlanHeight + 'px';
   recipesSection.style.flex = 'none';
-  recipesSection.style.height = Math.max(80, startRecipesHeight - delta) + 'px';
+  recipesSection.style.height = newRecipesHeight + 'px';
 });
 
 document.addEventListener('mouseup', function() {
@@ -1180,10 +1188,18 @@ document.addEventListener('touchmove', function(e) {
   const planSection = document.querySelector('#page-main .plan-section');
   const recipesSection = document.querySelector('#page-main .recipes-section');
   if (!planSection || !recipesSection) return;
+
+  const totalHeight = startPlanHeight + startRecipesHeight;
+  const minHeight = 80;
+  const maxPlanHeight = totalHeight - minHeight;
+
+  let newPlanHeight = Math.max(minHeight, Math.min(startPlanHeight + delta, maxPlanHeight));
+  let newRecipesHeight = totalHeight - newPlanHeight;
+
   planSection.style.flex = 'none';
-  planSection.style.height = Math.max(80, startPlanHeight + delta) + 'px';
+  planSection.style.height = newPlanHeight + 'px';
   recipesSection.style.flex = 'none';
-  recipesSection.style.height = Math.max(80, startRecipesHeight - delta) + 'px';
+  recipesSection.style.height = newRecipesHeight + 'px';
 });
 
 document.addEventListener('touchend', function() { dragging = false; });
