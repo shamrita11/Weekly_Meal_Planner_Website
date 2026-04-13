@@ -1,5 +1,6 @@
 import sqlite3
 from flask import Blueprint, request, jsonify, session
+from datetime import datetime, date, timedelta
 
 mealplan_bp = Blueprint('mealplan_bp', __name__)
 
@@ -27,6 +28,17 @@ def save_mealplan():
     day = data.get('day')
     meal_type = data.get('meal_type')
     recipe_id = data.get('recipe_id') # This will be None if the user is clearing the cell
+
+    # Determine if the edit is for a past week
+    try:
+        today = date.today()
+        current_monday = today - timedelta(days=today.weekday())
+        plan_monday = datetime.strptime(week_date, '%Y-%m-%d').date()
+        
+        # If the plan's Monday is before this week's Monday, it's in the past
+        is_past_week = plan_monday < current_monday
+    except (ValueError, TypeError):
+        is_past_week = False
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -76,14 +88,15 @@ def save_mealplan():
                 ''', (uid, week_date, day, meal_type, recipe_id))
 
         # -- Add new ingredients to shopping list --
-        cursor.execute('SELECT ingreID FROM Recipe_Ingredient WHERE recipeID = ?', (recipe_id,))
-        new_ings = cursor.fetchall()
-        
-        for ing in new_ings:
-            cursor.execute('''
-                INSERT INTO ShoppingList (userID, recipeID, ingreID, input_item, checked) 
-                VALUES (?, ?, ?, NULL, 'no')
-            ''', (uid, recipe_id, ing['ingreID']))
+        if not is_past_week:
+            cursor.execute('SELECT ingreID FROM Recipe_Ingredient WHERE recipeID = ?', (recipe_id,))
+            new_ings = cursor.fetchall()
+            
+            for ing in new_ings:
+                cursor.execute('''
+                    INSERT INTO ShoppingList (userID, recipeID, ingreID, input_item, checked) 
+                    VALUES (?, ?, ?, NULL, 'no')
+                ''', (uid, recipe_id, ing['ingreID']))
 
         conn.commit()
         return jsonify({"status": "success"}), 200
