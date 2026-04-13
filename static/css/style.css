@@ -154,7 +154,8 @@ body { font-family: var(--font-ui); background: var(--bg); color: var(--text); m
 .recipe-thumb-wrap { position: relative; cursor: pointer; }
 .recipe-thumb-wrap img { width: 90px; height: 90px; object-fit: cover; border-radius: var(--radius-sm); transition: transform 0.15s; display: block; }
 .recipe-thumb-wrap:hover img { transform: scale(1.05); }
-.no-img-thumb { width: 90px; height: 90px; background: var(--cell-empty); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; text-align: center; padding: 6px; color: rgba(255,255,255,0.8); cursor: pointer; }
+.no-img-thumb { width: 90px; height: 90px; background: var(--cell-empty); border-radius: var(--radius-sm); display: flex; align-items: center; 
+              justify-content: center; font-size: 0.7rem; text-align: center; padding: 6px; color: rgba(255,255,255,0.8); cursor: pointer; word-break: break-word; overflow: hidden;}
 .empty-recipes { color: rgba(255,255,255,0.5); font-size: 0.85rem; padding: 8px 0; }
 
 /* ══ MEALPLAN PAGE ══ */
@@ -579,6 +580,22 @@ body.light .auth-link a {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  align-items: flex-start; 
+  gap: 8px;
+}
+
+
+.recipe-title-text {
+  flex: 1; 
+  min-width: 0; 
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+.recipe-multiplier {
+  flex-shrink: 0; 
+  white-space: nowrap; 
+  margin-top: 1px; 
 }
 
 .ingredient-container {
