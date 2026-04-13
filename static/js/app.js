@@ -418,8 +418,22 @@ function assignRecipeToCell(recipeId) {
   .then(response => response.json())
   .then(data => {
     if (data.status === 'success') {
-      // Reload the page to automatically fetch the new grid and new shopping list
-      window.location.reload();
+      closeCellPicker();
+
+      loadMealPlansFromDB(() => {
+        if (window.location.pathname === '/mealplan') {
+          renderPlanGrid('mealplan-grid', mpWeekOffset);
+        } else if (window.location.pathname === '/dashboard') {
+          renderPlanGrid('main-plan-grid', 0);
+        }
+      });
+
+      loadShoppingListFromDB(() => {
+        if (window.location.pathname === '/dashboard') {
+          renderShoppingList();
+        }
+      });
+
     } else {
       alert('Database Error: ' + data.message);
     }
