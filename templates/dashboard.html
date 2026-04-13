@@ -21,10 +21,8 @@
       <!-- WEEKLY MEAL PLAN -->
       <section class="card plan-section">
         <div class="section-header">
-          <div class="week-header-row">
-            <button class="week-side-btn" id="main-prev-week" onclick="mainChangeWeek(-1)" title="Previous week">&#10094;</button>
+          <div class="week-header-row week-header-row-static">
             <span id="main-week-label">Loading…</span>
-            <button class="week-side-btn" id="main-next-week" onclick="mainChangeWeek(1)" title="Next week">&#10095;</button>
           </div>
         </div>
         <div class="plan-grid" id="main-plan-grid"></div>
@@ -41,8 +39,8 @@
         <div class="recipe-strip">
           <div id="main-recipe-list" class="recipe-thumbs"></div>
           <div class="strip-controls">
-            <button class="icon-btn" onclick="scrollRecipeStrip(-1)">&#8963;</button>
-            <button class="icon-btn" onclick="scrollRecipeStrip(1)">&#8964;</button>
+            <button class="icon-btn" onclick="scrollRecipeStrip(-1)" title="Scroll up">&#8963;</button>
+            <button class="icon-btn" onclick="scrollRecipeStrip(1)" title="Scroll down">&#8964;</button>
           </div>
         </div>
       </section>

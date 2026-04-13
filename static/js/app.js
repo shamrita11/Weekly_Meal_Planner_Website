@@ -9,8 +9,7 @@ let recipes = [];
 // weekKey = ISO Monday date string e.g. "2026-03-16"
 let mealPlans = {};
 
-// Current week offsets (0 = this week, -1 = last week, +1 = next week, etc.)
-let mainWeekOffset = 0;
+// Meal plan page week offset (0 = this week). Home dashboard always shows this week only.
 let mpWeekOffset = 0;
 
 let recipeShoppingList = []; // each element looks like {title, count, ingredients: [{itemID, ingredient, checked}, ...]}
@@ -90,19 +89,13 @@ function navigate(target) {
 function renderMainPage() {
   renderRecipeStrip();
   updateMainWeekLabel();
-  renderPlanGrid('main-plan-grid', mainWeekOffset);
+  renderPlanGrid('main-plan-grid', 0);
   renderShoppingList();
 }
 
 function updateMainWeekLabel() {
-  document.getElementById('main-week-label').textContent = getWeekLabel(mainWeekOffset);
-  document.getElementById('main-prev-week').disabled = false; // allow past
-}
-
-function mainChangeWeek(dir) {
-  mainWeekOffset += dir;
-  updateMainWeekLabel();
-  renderPlanGrid('main-plan-grid', mainWeekOffset);
+  const el = document.getElementById('main-week-label');
+  if (el) el.textContent = getWeekLabel(0);
 }
 
 // ══════════════════ MEAL PLAN PAGE ══════════════════
@@ -123,6 +116,7 @@ function mpChangeWeek(dir) {
 
 function renderRecipeStrip() {
   const container = document.getElementById('main-recipe-list');
+  if (!container) return;
   container.innerHTML = '';
   recipes.forEach(r => {
     const img = document.createElement('img');
@@ -144,12 +138,13 @@ function renderRecipeStrip() {
   });
 }
 
-let stripScroll = 0;
+/** Step matches thumb row height (80px thumb + gap) for the Your Recipes strip. */
+const RECIPE_STRIP_SCROLL_STEP = 90;
+
 function scrollRecipeStrip(dir) {
   const container = document.getElementById('main-recipe-list');
-  stripScroll = Math.max(0, Math.min(stripScroll + dir, recipes.length - 1));
-  const thumbWidth = 90;
-  container.style.transform = `translateX(-${stripScroll * thumbWidth}px)`;
+  if (!container) return;
+  container.scrollBy({ top: dir * RECIPE_STRIP_SCROLL_STEP, behavior: 'smooth' });
 }
 
 // ══════════════════ SHOPPING LIST ══════════════════
@@ -919,15 +914,7 @@ function saveRecipe() {
     return;
   }
   if (ingredients.length === 0) {
-    alert('Add at least one ingredient with a name (and optionally an amount).');
-    return;
-  }
-  if (tags.length === 0) {
-    alert('Add at least one tag using the tag field and + button.');
-    return;
-  }
-  if (!instructions) {
-    alert('Please fill in the instructions.');
+    alert('Add at least one ingredient with a name (amount is optional).');
     return;
   }
 
@@ -996,10 +983,21 @@ function syncStats() {
 // ══════════════════ THEME TOGGLE ══════════════════
 let isDark = localStorage.getItem('theme') !== 'light';
 
+/** Welcome + auth pages always use the default dark theme (saved preference applies on app pages). */
+function isPublicLandingPath() {
+  const p = window.location.pathname;
+  return p === '/' || p === '/login' || p === '/signup';
+}
+
 function applyTheme() {
+  if (isPublicLandingPath()) {
+    document.body.classList.remove('light');
+    return;
+  }
+  isDark = localStorage.getItem('theme') !== 'light';
   document.body.classList.toggle('light', !isDark);
   const label = isDark ? '🌙 Dark' : '☀️ Light';
-  document.querySelectorAll('.theme-toggle').forEach(btn => btn.textContent = label);
+  document.querySelectorAll('.theme-toggle').forEach(btn => (btn.textContent = label));
 }
 
 function toggleTheme() {
