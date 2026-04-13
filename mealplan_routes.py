@@ -58,7 +58,7 @@ def save_mealplan():
             return jsonify({"status": "success"}), 200
 
         # -- Remove old recipe's ingre from shopping list--
-        if old_recipe_id:
+        if old_recipe_id and not is_past_week:
             cursor.execute('SELECT ingreID FROM Recipe_Ingredient WHERE recipeID = ?', (old_recipe_id,))
             old_ings = cursor.fetchall()
             
@@ -88,7 +88,7 @@ def save_mealplan():
                 ''', (uid, week_date, day, meal_type, recipe_id))
 
         # -- Add new ingredients to shopping list --
-        if not is_past_week:
+        if recipe_id is not None and not is_past_week:
             cursor.execute('SELECT ingreID FROM Recipe_Ingredient WHERE recipeID = ?', (recipe_id,))
             new_ings = cursor.fetchall()
             
