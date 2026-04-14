@@ -24,21 +24,45 @@ app.register_blueprint(recipe_bp)
 app.register_blueprint(mealplan_bp)
 app.register_blueprint(shop_bp)
 app.register_blueprint(user_bp)
+    
+def is_valid_user():
+    """ Validates the current session against the database."""
+    if 'user_id' not in session:
+        return False
+    user_id = session.get('user_id')
+    conn = sqlite3.connect('./db/mydatabase.db')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('SELECT userID FROM User WHERE userID = ?', (user_id,))
+        if cursor.fetchone():
+            return True
+        else:
+            # If the DB says they don't exist, destroy their invalid cookie
+            session.pop('user_id', None)
+            session.pop('username', None)
+            return False
+            
+    except Exception as e:
+        print(f"Database error during validation: {e}")
+        return False
+        
+    finally:
+        conn.close()
 
 # Decorator function that redirects to login if no user is in the session
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if 'user_id' not in session:
+        if not is_valid_user():
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated
 
-
 @app.route('/')
 def index():
     # If already logged in, go straight to dashboard
-    if 'user_id' in session:
+    if is_valid_user():
         return redirect(url_for('dashboard'))
     return render_template('index.html')
 
